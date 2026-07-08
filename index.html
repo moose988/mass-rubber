@@ -1,0 +1,424 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rubber Mass Ring Selection Tool V11</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+:root{
+  --dark:#0f172a; --blue:#1d4ed8; --blue-dark:#1e40af; --green:#15803d; --red:#b91c1c; --amber:#b45309;
+  --bg:#eef2f7; --panel:#ffffff; --line:#d7dee8; --muted:#64748b; --soft:#f8fafc;
+  --text:#111827; --text-soft:#334155; --radius:10px; --shadow:0 18px 45px rgba(15,23,42,.10);
+  --focus:0 0 0 3px rgba(37,99,235,.18);
+}
+*{box-sizing:border-box}
+html{background:var(--bg);width:100%;max-width:100%;overflow-x:hidden}
+body{font-family:Arial,Helvetica,sans-serif;margin:0;background:linear-gradient(180deg,#f8fafc 0,#eef2f7 260px,var(--bg) 100%);color:var(--text);font-size:15px;line-height:1.45;width:100%;max-width:100%;overflow-x:hidden}
+header{background:linear-gradient(135deg,#0f172a 0,#17315f 100%);color:white;padding:28px 20px 30px;text-align:center;border-bottom:1px solid rgba(255,255,255,.12)}
+header h1{margin:0;font-size:clamp(24px,4vw,34px);line-height:1.15;font-weight:800;letter-spacing:0}
+main{width:min(1180px,calc(100% - 32px));margin:20px auto 34px;background:var(--panel);padding:24px;border-radius:14px;box-shadow:var(--shadow);border:1px solid rgba(148,163,184,.25)}
+h2{border-bottom:1px solid #e2e8f0;padding:20px 0 10px;margin:12px 0 16px;color:#0f172a;font-size:19px;line-height:1.25}
+h3{margin:22px 0 10px;color:#0f172a;font-size:16px;line-height:1.3}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:14px 16px}
+.grid > div,.topbar > *{min-width:0}
+label{font-weight:700;font-size:13px;line-height:1.35;display:block;margin-bottom:6px;color:#263244}
+input,select,textarea{width:100%;min-width:0;min-height:42px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;background:white;color:#0f172a;font-size:14px;line-height:1.3;box-shadow:0 1px 1px rgba(15,23,42,.02);transition:border-color .16s ease,box-shadow .16s ease,background-color .16s ease}
+select{appearance:auto}
+textarea{min-height:76px;resize:vertical}
+input::placeholder{color:#94a3b8}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#2563eb;box-shadow:var(--focus)}
+button{background:var(--blue);color:white;border:none;border-radius:8px;padding:11px 16px;margin:0;font-weight:700;cursor:pointer;font-size:14px;line-height:1.2;min-width:0;min-height:42px;transition:background-color .16s ease,box-shadow .16s ease,transform .16s ease}
+button:hover{background:var(--blue-dark);box-shadow:0 8px 18px rgba(37,99,235,.18)}
+button:active{transform:translateY(1px)}
+button:focus-visible{outline:none;box-shadow:var(--focus),0 8px 18px rgba(37,99,235,.18)}
+.green{background:var(--green)}.green:hover{background:#166534;box-shadow:0 8px 18px rgba(21,128,61,.18)}
+.secondary{background:#334155}.secondary:hover{background:#1e293b;box-shadow:0 8px 18px rgba(51,65,85,.18)}
+.danger{background:var(--red)}.danger:hover{background:#991b1b;box-shadow:0 8px 18px rgba(185,28,28,.18)}
+.amber{background:var(--amber)}.amber:hover{background:#92400e;box-shadow:0 8px 18px rgba(180,83,9,.18)}
+.bigbutton{font-size:16px;padding:14px 18px;width:100%;min-height:50px}
+.note,.warning{padding:14px 16px;border-radius:10px;margin:14px 0;line-height:1.55;color:#1e293b}
+.note{background:#eff6ff;border:1px solid #bfdbfe;border-left:5px solid var(--blue)}
+.warning{background:#fffbeb;border:1px solid #fde68a;border-left:5px solid var(--amber)}
+.cardrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:14px}
+.card{border:1px solid #e2e8f0;border-radius:10px;padding:15px;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.card b{display:block;margin-bottom:7px;color:#334155;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.card .value{display:block;font-size:22px;line-height:1.2;font-weight:800;color:#0f172a;overflow-wrap:anywhere}
+.low{color:#15803d}.medium{color:#b45309}.high{color:#b91c1c}
+.table-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:12px;border:1px solid var(--line);border-radius:10px;background:#fff}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:680px}
+th,td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:9px 10px;text-align:center;vertical-align:middle}
+th:last-child,td:last-child{border-right:0}
+tr:last-child td{border-bottom:0}
+th{background:#f1f5f9;color:#263244;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+td input,td select{min-width:115px;padding:8px;min-height:38px}
+.final{background:#f0fdf4;border:1px solid #86efac;border-left:5px solid #16a34a;border-radius:12px;padding:18px;margin-top:16px;font-size:16px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+.details{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-top:14px;white-space:pre-wrap;line-height:1.55;color:#1f2937;overflow:auto;max-width:100%}
+.error{background:#fef2f2;border-color:#fecaca;border-left-color:#dc2626}.muted{color:var(--muted);font-size:12px;line-height:1.45}.topbar{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:16px;display:grid;grid-template-columns:1.4fr repeat(4,auto);gap:10px;align-items:center}.hidden{display:none}.recommended{background:#ecfdf5;font-weight:bold}.nowrap{white-space:nowrap}
+.action-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+@media (max-width: 780px){
+  main{width:calc(100% - 20px);margin:12px auto 24px;padding:18px;border-radius:12px}
+  header{padding:24px 14px}
+  .topbar{grid-template-columns:1fr}
+  .topbar button,.action-row button{width:100%}
+  .grid{grid-template-columns:1fr;gap:12px}
+  h2{font-size:18px;margin-top:8px}
+  .cardrow{grid-template-columns:1fr}
+  .final,.details{font-size:14px}
+}
+@media (max-width: 560px){
+  body{font-size:14px}
+  header{padding:24px 12px}
+  header h1{font-size:20px;line-height:1.2;max-width:320px;margin:0 auto;overflow-wrap:break-word}
+  main{width:100%;max-width:100%;margin:0;padding:12px;border-radius:0;border-left:0;border-right:0;overflow:hidden}
+  .topbar{padding:12px;max-width:100%;overflow:hidden}
+  .topbar button{font-size:13px;white-space:normal}
+  .note,.warning{padding:12px;overflow-wrap:anywhere}
+  input,select,textarea,button{max-width:100%}
+  #blockedTable{min-width:0;border-collapse:separate;border-spacing:0;background:#f8fafc}
+  #blockedTable thead{display:none}
+  #blockedTable,#blockedTable tbody,#blockedTable tr,#blockedTable td{display:block;width:100%}
+  #blockedTable tr{background:#fff;border-bottom:1px solid var(--line);padding:10px}
+  #blockedTable td{border:0;text-align:left;padding:7px 0}
+  #blockedTable td::before{display:block;margin-bottom:5px;color:#64748b;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+  #blockedTable td:nth-child(1)::before{content:"No."}
+  #blockedTable td:nth-child(2)::before{content:"Type"}
+  #blockedTable td:nth-child(3)::before{content:"Position Along Total Discharge Line"}
+  #blockedTable td:nth-child(4)::before{content:"Unit"}
+  #blockedTable td:nth-child(5)::before{content:"Notes"}
+  #blockedTable td input,#blockedTable td select{min-width:0;width:100%}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{transition:none!important;scroll-behavior:auto!important}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Rubber Mass Ring Selection Tool</h1>
+</header>
+<main>
+<div class="topbar">
+  <button class="bigbutton green" onclick="calculateRecommendation()">Calculate Recommendation</button>
+  <button class="amber" onclick="loadCurrentCase()">Load Current Unit Case</button>
+  <button class="secondary" onclick="saveUnit()">Save Unit</button>
+  <button class="secondary" onclick="downloadCSV()">Download Saved CSV</button>
+  <button class="danger" onclick="clearSaved()">Clear Saved Data</button>
+</div>
+
+<div class="note">
+This version uses the full discharge line length entered by the worker. It does not ask for supports and does not shorten the span because the project is studying the line without support-based span reduction. The tool calculates the safety clearance internally. Workers only enter pipe length, pipe size, U-trap geometry, measured frequencies, and vibration readings.
+</div>
+
+<h2>1. Unit Information</h2>
+<div class="grid">
+  <div><label>Load Saved Unit / Model</label><select id="savedPreset" onchange="applySavedPreset()"><option value="">Manual entry / no preset</option><option value="p00046599052601488">p00046599052601488 - APMR51120G1</option></select></div>
+  <div><label>Unit Number</label><input id="unitNumber" oninput="setVal('savedPreset','')" onblur="applyPresetFromUnitInfo()" placeholder="Type unit number"></div>
+  <div><label>Unit Model</label><input id="unitModel" oninput="setVal('savedPreset','')" onblur="applyPresetFromUnitInfo()" placeholder="Type model"></div>
+  <div><label>Date</label><input id="testDate" type="date"></div>
+  <div><label>Tester Name</label><input id="testerName" placeholder="Tester name"></div>
+</div>
+
+<h2>2. Discharge Line Inputs</h2>
+<div class="grid">
+  <div><label>Total Discharge Line Length</label><input id="lineLength" type="number" step="any" placeholder="Full line length"></div>
+  <div><label>Length Unit</label><select id="lineUnit"><option value="mm">mm</option><option value="inch">inch</option><option value="m">m</option></select></div>
+  <div><label>Pipe Size Preset</label><select id="pipePreset" onchange="applyPipePreset()"><option value="custom">Custom</option><option value="7/8x0.045">7/8 in OD x 0.045 in wall copper</option><option value="5/8x0.035">5/8 in OD x 0.035 in wall copper</option><option value="3/4x0.035">3/4 in OD x 0.035 in wall copper</option><option value="1x0.049">1 in OD x 0.049 in wall copper</option></select></div>
+  <div><label>Pipe Outside Diameter</label><input id="pipeOD" type="number" step="any" placeholder="Example: 7/8 or 22.225"></div>
+  <div><label>OD Unit</label><select id="pipeODUnit"><option value="mm">mm</option><option value="inch">inch</option></select></div>
+  <div><label>Wall Thickness</label><input id="pipeT" type="number" step="any" placeholder="Example: 0.045 or 1.143"></div>
+  <div><label>Thickness Unit</label><select id="pipeTUnit"><option value="mm">mm</option><option value="inch">inch</option></select></div>
+</div>
+<div class="muted">Material constants used internally: copper density = 8940 kg/m^3, Young's modulus = 110 GPa.</div>
+
+<h2>3. Operating Conditions</h2>
+<div class="grid">
+  <div><label>Compressor Running Speed</label><input id="compSpeed" type="number" step="any" placeholder="Example: 700"></div>
+  <div><label>Speed Unit</label><select id="compSpeedUnit"><option value="RPM">RPM</option><option value="Hz">Hz</option></select></div>
+  <div><label>Speed Type</label><select id="compSpeedType" onchange="toggleVfdMax()"><option value="fixed">Fixed speed</option><option value="variable">Variable speed / VFD</option></select></div>
+  <div id="vfdMaxBox" class="hidden"><label>Maximum Speed for VFD</label><input id="compSpeedMax" type="number" step="any" placeholder="Same unit as running speed"></div>
+  <div><label>Pipe Surface Temp at Ring Location, deg C</label><input id="surfaceTemp" type="number" step="any" placeholder="Measured temperature"></div>
+  <div><label>Refrigerant Type</label><input id="refrigerant" placeholder="Example: R410A / R32"></div>
+</div>
+
+<h2>4. Measurement Inputs</h2>
+<div class="note">
+Natural frequency is from the hammer/bump test. Operating dominant frequency is from the running compressor spectrum. The tool uses natural frequency for predicted frequency shift and resonance risk.
+</div>
+<div class="grid">
+  <div><label>Measured Natural Frequency, Hz</label><input id="fNaturalMeasured" type="number" step="any" placeholder="Example: 35"></div>
+  <div><label>Operating Dominant Frequency, Hz</label><input id="fOperating" type="number" step="any" placeholder="Example: 50"></div>
+  <div><label>Highest RMS Vibration, mm/s</label><input id="vRms" type="number" step="any" placeholder="Example: 11.94"></div>
+  <div><label>Peak Velocity, mm/s</label><input id="vPeak" type="number" step="any" placeholder="Example: 25"></div>
+  <div><label>Highest Displacement</label><input id="disp" type="number" step="any" placeholder="Example: 24.94"></div>
+  <div><label>Displacement Unit</label><select id="dispUnit"><option value="um">um</option><option value="mm">mm</option></select></div>
+  <div><label>Peak Location Name</label><input id="peakName" placeholder="Example: Location 5"></div>
+  <div><label>Peak Location Along Total Discharge Line</label><input id="peakLocation" type="number" step="any" placeholder="Example: 30"></div>
+  <div><label>Peak Location Unit</label><select id="peakUnit"><option value="mm">mm</option><option value="inch">inch</option><option value="m">m</option></select></div>
+</div>
+
+<h2>5. Simple U-Trap Builder</h2>
+<div class="warning">
+Enter the U-trap as three connected pipe pieces. Example for your case: after 4 inch along the total discharge line, the pipe goes 12 inch down, 3 inch left, and 7 inch up. The tool blocks this full U-trap zone automatically and adds clearance by itself.
+</div>
+<div class="grid">
+  <div><label>U-Trap Start Position Along Total Discharge Line</label><input id="utrapStart" type="number" step="any" placeholder="Example: 4"></div>
+  <div><label>Start Unit</label><select id="utrapStartUnit"><option value="mm">mm</option><option value="inch">inch</option><option value="m">m</option></select></div>
+  <div><label>Piece 1 Length</label><input id="utrapP1" type="number" step="any" placeholder="Example: 12"></div>
+  <div><label>Piece 2 Length</label><input id="utrapP2" type="number" step="any" placeholder="Example: 3"></div>
+  <div><label>Piece 3 Length</label><input id="utrapP3" type="number" step="any" placeholder="Example: 7"></div>
+  <div><label>Piece Unit</label><select id="utrapPieceUnit"><option value="mm">mm</option><option value="inch">inch</option><option value="m">m</option></select></div>
+  <div><label>Braze Location in U-Trap</label><select id="utrapBraze"><option value="none">No braze entered</option><option value="p1mid">Middle of Piece 1</option><option value="p2mid">Middle of Piece 2</option><option value="p3mid">Middle of Piece 3</option></select></div>
+</div>
+
+<h2>6. Other No-Place Points</h2>
+<div class="warning">
+Enter only bends or brazed joints outside the U-trap. Do not enter supports. The tool decides the clearance internally.
+</div>
+<div class="table-wrap">
+  <table id="blockedTable"><thead><tr><th>No.</th><th>Type</th><th>Position Along Total Discharge Line</th><th>Unit</th><th>Notes</th></tr></thead><tbody></tbody></table>
+</div>
+<div class="action-row">
+  <button class="secondary" onclick="addBlockedRow()">Add No-Place Point</button>
+  <button class="secondary" onclick="removeBlockedRow()">Remove Last Point</button>
+</div>
+
+<h2>7. Output</h2>
+<div id="finalOutput" class="final">Fill the inputs, then press Calculate Recommendation.</div>
+<div id="summaryCards" class="cardrow"></div>
+
+<h3>7a. Mass Candidates & Resonance Risk</h3>
+<div id="massTableOutput"></div>
+
+<h3>7b. Full Calculation Record</h3>
+<div id="technicalOutput" class="details"></div>
+
+<h3>7c. Validation After Ring Installation</h3>
+<div class="grid">
+  <div><label>After-Ring Natural Frequency, Hz</label><input id="fNaturalAfter" type="number" step="any" placeholder="Hammer test after ring"></div>
+  <div><label>After-Ring RMS Vibration, mm/s</label><input id="vRmsAfter" type="number" step="any" placeholder="Running test after ring"></div>
+</div>
+<div id="validationOutput" class="details">No after-ring validation entered yet.</div>
+
+<div class="warning">
+Final approval still needs before/after vibration measurement, clearance inspection, sag check, and fatigue screening. Do not claim support removal based only on this first-trial calculation.
+</div>
+</main>
+<script>
+const COPPER_DENSITY = 8940;
+const COPPER_E = 110e9;
+const MODAL_MASS_FACTOR = 0.5;
+const CLEARANCE_BEND_MM = 30;
+const CLEARANCE_BRAZE_MM = 30;
+const CLEARANCE_UTRAP_MM = 30;
+const EPS_SAFE_MM = 1;
+const STORAGE_KEY = 'rubber_mass_ring_worker_tool_v11_records';
+const BC_TABLE = {
+  'Simply supported':[Math.PI,2*Math.PI,3*Math.PI],
+  'Fixed-pinned':[3.927,7.069,10.210],
+  'Fixed-fixed':[4.730,7.853,10.996],
+  'Cantilever':[1.875,4.694,7.855]
+};
+const UNIT_PRESETS = [
+  {
+    unitNumber:'p00046599052601488',
+    unitModel:'APMR51120G1',
+    pipePreset:'7/8x0.045',
+    pipeOD:'0.875',
+    pipeODUnit:'inch',
+    pipeT:'0.045',
+    pipeTUnit:'inch',
+    compSpeed:'700',
+    compSpeedUnit:'RPM',
+    compSpeedType:'fixed',
+    fOperating:'50',
+    vRms:'11.94',
+    vPeak:'24.94',
+    disp:'44.4',
+    dispUnit:'um',
+    peakName:'Location 3'
+  }
+];
+let lastRecord=null;
+function el(id){return document.getElementById(id)}
+function val(id){const x=parseFloat(el(id)?.value); return isNaN(x)?0:x}
+function text(id){return el(id)?.value || ''}
+function fmt(x,d=2){return Number.isFinite(x)?Number(x).toFixed(d):'not calculated'}
+function toMM(x,u){ if(!x || x<=0) return 0; if(u==='inch') return x*25.4; if(u==='m') return x*1000; return x; }
+function toInch(mm){return mm/25.4}
+function toHz(x,u){ if(!x || x<=0) return 0; return u==='RPM'?x/60:x; }
+function clamp(x,min,max){return Math.max(min,Math.min(max,x))}
+function setVal(id,v){ if(el(id)) el(id).value=v }
+function findUnitPreset(){
+  const unit=text('unitNumber').trim();
+  const model=text('unitModel').trim();
+  return UNIT_PRESETS.find(p=>p.unitNumber===unit || p.unitModel===model) || null;
+}
+function applyPreset(preset){
+  if(!preset) return;
+  setVal('savedPreset',preset.unitNumber);
+  setVal('unitNumber',preset.unitNumber);
+  setVal('unitModel',preset.unitModel);
+  setVal('pipePreset',preset.pipePreset);
+  setVal('pipeOD',preset.pipeOD);
+  setVal('pipeODUnit',preset.pipeODUnit);
+  setVal('pipeT',preset.pipeT);
+  setVal('pipeTUnit',preset.pipeTUnit);
+  setVal('compSpeed',preset.compSpeed);
+  setVal('compSpeedUnit',preset.compSpeedUnit);
+  setVal('compSpeedType',preset.compSpeedType);
+  setVal('compSpeedMax','');
+  setVal('fOperating',preset.fOperating);
+  setVal('vRms',preset.vRms);
+  setVal('vPeak',preset.vPeak);
+  setVal('disp',preset.disp);
+  setVal('dispUnit',preset.dispUnit);
+  setVal('peakName',preset.peakName);
+  toggleVfdMax();
+}
+function applySavedPreset(){
+  const key=text('savedPreset');
+  const preset=UNIT_PRESETS.find(p=>p.unitNumber===key) || null;
+  applyPreset(preset);
+}
+function applyPresetFromUnitInfo(){
+  applyPreset(findUnitPreset());
+}
+function toggleVfdMax(){ el('vfdMaxBox').className = text('compSpeedType')==='variable' ? '' : 'hidden'; }
+function applyPipePreset(){
+  const p=text('pipePreset');
+  if(p==='7/8x0.045'){setVal('pipeOD','0.875'); setVal('pipeODUnit','inch'); setVal('pipeT','0.045'); setVal('pipeTUnit','inch');}
+  else if(p==='5/8x0.035'){setVal('pipeOD','0.625'); setVal('pipeODUnit','inch'); setVal('pipeT','0.035'); setVal('pipeTUnit','inch');}
+  else if(p==='3/4x0.035'){setVal('pipeOD','0.75'); setVal('pipeODUnit','inch'); setVal('pipeT','0.035'); setVal('pipeTUnit','inch');}
+  else if(p==='1x0.049'){setVal('pipeOD','1'); setVal('pipeODUnit','inch'); setVal('pipeT','0.049'); setVal('pipeTUnit','inch');}
+}
+function addBlockedRow(values={}){
+  const tbody=document.querySelector('#blockedTable tbody'); const i=tbody.children.length; const row=document.createElement('tr');
+  row.innerHTML=`<td>${i+1}</td><td><select id="bType${i}"><option ${values.type==='Bend'?'selected':''}>Bend</option><option ${values.type==='Brazed joint'?'selected':''}>Brazed joint</option><option ${values.type==='Other blocked point'?'selected':''}>Other blocked point</option></select></td><td><input id="bPos${i}" type="number" step="any" value="${values.pos||''}" placeholder="Position"></td><td><select id="bUnit${i}"><option value="mm" ${values.unit==='mm'?'selected':''}>mm</option><option value="inch" ${values.unit==='inch'?'selected':''}>inch</option><option value="m" ${values.unit==='m'?'selected':''}>m</option></select></td><td><input id="bNote${i}" value="${values.note||''}" placeholder="Notes"></td>`;
+  tbody.appendChild(row);
+}
+function removeBlockedRow(){const tbody=document.querySelector('#blockedTable tbody'); if(tbody.children.length>0) tbody.removeChild(tbody.lastElementChild)}
+function clearBlockedRows(){document.querySelector('#blockedTable tbody').innerHTML=''}
+function loadCurrentCase(){
+  setVal('unitNumber','UNIT 001'); setVal('unitModel','PAC'); setVal('testerName','DAHAM');
+  setVal('lineLength','49.25'); setVal('lineUnit','inch'); setVal('pipePreset','7/8x0.045'); applyPipePreset();
+  setVal('compSpeed','700'); setVal('compSpeedUnit','RPM'); setVal('compSpeedType','fixed'); toggleVfdMax(); setVal('compSpeedMax','');
+  setVal('fNaturalMeasured','35'); setVal('fOperating','50'); setVal('vRms','11.94'); setVal('vPeak','25'); setVal('disp','24.94'); setVal('dispUnit','um'); setVal('peakName','Location 5'); setVal('peakLocation','30'); setVal('peakUnit','inch');
+  setVal('utrapStart','4'); setVal('utrapStartUnit','inch'); setVal('utrapP1','12'); setVal('utrapP2','3'); setVal('utrapP3','7'); setVal('utrapPieceUnit','inch'); setVal('utrapBraze','p3mid');
+  clearBlockedRows();
+  addBlockedRow({type:'Bend',pos:34.75,unit:'inch',note:'bend before diagonal section'});
+  addBlockedRow({type:'Bend',pos:44.75,unit:'inch',note:'bend left after diagonal section'});
+  calculateRecommendation();
+}
+function getBlocked(totalMM){
+  const zones=[]; const points=[];
+  const us=toMM(val('utrapStart'),text('utrapStartUnit')); const p1=toMM(val('utrapP1'),text('utrapPieceUnit')); const p2=toMM(val('utrapP2'),text('utrapPieceUnit')); const p3=toMM(val('utrapP3'),text('utrapPieceUnit'));
+  if(us>0 && (p1+p2+p3)>0){
+    const uEnd=us+p1+p2+p3;
+    zones.push({type:'U-trap zone',start:Math.max(0,us-CLEARANCE_UTRAP_MM-EPS_SAFE_MM),end:Math.min(totalMM,uEnd+CLEARANCE_UTRAP_MM+EPS_SAFE_MM),rawStart:us,rawEnd:uEnd});
+    const b=text('utrapBraze'); let bp=0;
+    if(b==='p1mid') bp=us+p1/2; if(b==='p2mid') bp=us+p1+p2/2; if(b==='p3mid') bp=us+p1+p2+p3/2;
+    if(bp>0) points.push({type:'Brazed joint in U-trap',pos:bp,clearance:CLEARANCE_BRAZE_MM});
+  }
+  const tbody=document.querySelector('#blockedTable tbody');
+  for(let i=0;i<tbody.children.length;i++){
+    const p=toMM(val(`bPos${i}`),text(`bUnit${i}`)); const typ=text(`bType${i}`);
+    if(p>0 && p<totalMM){
+      const clearance = typ==='Brazed joint' ? CLEARANCE_BRAZE_MM : CLEARANCE_BEND_MM;
+      points.push({type:typ,pos:p,clearance,note:text(`bNote${i}`)});
+    }
+  }
+  for(const p of points){zones.push({type:p.type,start:Math.max(0,p.pos-p.clearance-EPS_SAFE_MM),end:Math.min(totalMM,p.pos+p.clearance+EPS_SAFE_MM),center:p.pos});}
+  return zones.sort((a,b)=>a.start-b.start);
+}
+function pipeCalc(totalMM){
+  const ODmm=toMM(val('pipeOD'),text('pipeODUnit')); const tmm=toMM(val('pipeT'),text('pipeTUnit')); const IDmm=ODmm-2*tmm; const errors=[];
+  if(totalMM<=0) errors.push('Enter the total discharge line length.'); if(ODmm<=0) errors.push('Enter the pipe outside diameter.'); if(tmm<=0) errors.push('Enter the wall thickness.'); if(IDmm<=0 || IDmm>=ODmm) errors.push('Pipe OD/thickness gives an invalid inside diameter.');
+  let area=0,I=0,mPrime=0,totalMass=0,modalMass=0,EI=0;
+  if(errors.length===0){ const OD=ODmm/1000, ID=IDmm/1000, L=totalMM/1000; area=Math.PI/4*(OD*OD-ID*ID); I=Math.PI/64*(Math.pow(OD,4)-Math.pow(ID,4)); mPrime=COPPER_DENSITY*area; totalMass=mPrime*L; modalMass=MODAL_MASS_FACTOR*totalMass; EI=COPPER_E*I; }
+  return {ODmm,tmm,IDmm,area,I,mPrime,totalMass,modalMass,EI,errors};
+}
+function naturalFrequencies(totalMM,pipe){ const L=totalMM/1000; if(L<=0||pipe.EI<=0||pipe.mPrime<=0) return []; return BC_TABLE['Simply supported'].map((lam,i)=>({mode:i+1,lambda:lam,f:(lam*lam/(2*Math.PI*L*L))*Math.sqrt(pipe.EI/pipe.mPrime)})); }
+function closestMode(f, freqs){ if(!freqs.length) return null; return freqs.reduce((a,b)=>Math.abs(b.f-f)<Math.abs(a.f-f)?b:a,freqs[0]); }
+function antinodesForMode(mode,totalMM){ const arr=[]; for(let k=0;k<mode;k++) arr.push(((2*k+1)*totalMM)/(2*mode)); return arr; }
+function isInZone(x,z){return x>=z.start && x<=z.end}
+function nearestZone(x,zones){ let best=null,dist=Infinity; for(const z of zones){let d=0;if(x<z.start)d=z.start-x;else if(x>z.end)d=x-z.end;else d=0;if(d<dist){dist=d;best=z}} return {zone:best,distance:dist}; }
+function makeSafe(x,totalMM,zones){
+  let candidate=clamp(x,CLEARANCE_BEND_MM,totalMM-CLEARANCE_BEND_MM);
+  for(let iter=0;iter<50;iter++){
+    const z=zones.find(zz=>isInZone(candidate,zz));
+    if(!z) return {x:candidate,moved:Math.abs(candidate-x),reason:'clear of blocked zones'};
+    const left=clamp(z.start-EPS_SAFE_MM,CLEARANCE_BEND_MM,totalMM-CLEARANCE_BEND_MM);
+    const right=clamp(z.end+EPS_SAFE_MM,CLEARANCE_BEND_MM,totalMM-CLEARANCE_BEND_MM);
+    const leftBlocked=zones.some(zz=>isInZone(left,zz)); const rightBlocked=zones.some(zz=>isInZone(right,zz));
+    if(!leftBlocked && !rightBlocked) candidate=Math.abs(left-x)<=Math.abs(right-x)?left:right;
+    else if(!leftBlocked) candidate=left;
+    else if(!rightBlocked) candidate=right;
+    else candidate=clamp(right+CLEARANCE_BEND_MM,CLEARANCE_BEND_MM,totalMM-CLEARANCE_BEND_MM);
+  }
+  return {x:candidate,moved:Math.abs(candidate-x),reason:'fallback safe position'};
+}
+function chooseLocation(totalMM,mode,zones){
+  const peak=toMM(val('peakLocation'),text('peakUnit')); const antis=antinodesForMode(mode,totalMM); let target=antis[0]; if(peak>0) target=antis.reduce((a,b)=>Math.abs(b-peak)<Math.abs(a-peak)?b:a,antis[0]); const safe=makeSafe(target,totalMM,zones); const near=nearestZone(safe.x,zones); return {targetAntinode:target,recommended:safe.x,moved:safe.moved,reason:safe.reason,antinodes:antis,nearestZone:near.zone};
+}
+function getLineSection(positionMM,totalMM){
+  const oneThird=totalMM/3;
+  let section=1;
+  if(positionMM>oneThird && positionMM<=2*oneThird) section=2;
+  else if(positionMM>2*oneThird) section=3;
+  const startMM=(section-1)*oneThird;
+  const endMM=section*oneThird;
+  return {
+    section,
+    name:`Section ${section}`,
+    startMM,
+    endMM,
+    startInch:startMM/25.4,
+    endInch:endMM/25.4
+  };
+}
+function speedBand(){ const s=toHz(val('compSpeed'),text('compSpeedUnit')); const type=text('compSpeedType'); const max=toHz(val('compSpeedMax'),text('compSpeedUnit')); if(s<=0) return null; return {lo:s,hi:(type==='variable'&&max>s)?max:s}; }
+function harmonicBands(){ const band=speedBand(); if(!band) return []; const arr=[]; for(let n=1;n<=6;n++){arr.push({order:n,lo:band.lo*n,hi:band.hi*n,label:`${n}X motor harmonic`});} return arr; }
+function assessResonanceRisk(freq){
+  const hs=harmonicBands(); if(freq<=0||hs.length===0) return {level:'No speed data',cls:'medium',text:'Compressor speed is missing, so resonance risk cannot be checked.',closest:null,diffPct:null};
+  let best=null;
+  for(const h of hs){ const target=(h.lo+h.hi)/2; let dist=0;if(freq<h.lo)dist=h.lo-freq;else if(freq>h.hi)dist=freq-h.hi;else dist=0; const pct=target>0?dist/target*100:999; if(!best||pct<best.diffPct) best={...h,target,dist,diffPct:pct}; }
+  let level='Low',cls='low'; if(best.diffPct<=5){level='High';cls='high'} else if(best.diffPct<=10){level='Medium';cls='medium'}
+  const range = Math.abs(best.lo-best.hi)<0.0001 ? `${fmt(best.target,2)} Hz` : `${fmt(best.lo,2)}-${fmt(best.hi,2)} Hz`;
+  const text = `${level} - ${fmt(freq,2)} Hz is ${fmt(best.diffPct,1)}% from ${best.label} (${range}).`;
+  return {level,cls,text,closest:best,diffPct:best.diffPct};
+}
+function severityMassRatio(vrms,currentRisk){ if(currentRisk.level==='High') return 0.15; if(vrms>7.1) return 0.15; if(currentRisk.level==='Medium') return 0.10; if(vrms>4.5) return 0.10; return 0.05; }
+function calibrateBoundaryCondition(fMeasured,mode,totalMM,pipe){
+  const L=totalMM/1000; if(fMeasured<=0||L<=0||pipe.EI<=0||pipe.mPrime<=0) return null;
+  const lambdaEff=Math.sqrt((fMeasured*2*Math.PI*L*L)/Math.sqrt(pipe.EI/pipe.mPrime));
+  let best=null,bestDiff=Infinity; const rows=[]; for(const bc in BC_TABLE){ const lam=BC_TABLE[bc][mode-1]; const diff=Math.abs(lam-lambdaEff); rows.push({bc,lam,diff}); if(diff<bestDiff){bestDiff=diff; best=bc;} } rows.sort((a,b)=>a.diff-b.diff); return {lambdaEff,closestBC:best,rows};
+}
+function calculateRecommendation(){
+  const totalMM=toMM(val('lineLength'),text('lineUnit')); const pipe=pipeCalc(totalMM); const fNat=val('fNaturalMeasured'); const fOp=val('fOperating'); const vRms=val('vRms'); const errors=[...pipe.errors]; if(fNat<=0) errors.push('Enter the measured natural frequency from the hammer/bump test.'); if(val('compSpeed')<=0) errors.push('Enter the compressor running speed.');
+  const final=el('finalOutput'),cards=el('summaryCards'),massOut=el('massTableOutput'),tech=el('technicalOutput'),validation=el('validationOutput');
+  if(errors.length){ final.className='final error'; final.textContent='Fix these inputs first:\n- '+errors.join('\n- '); cards.innerHTML=''; massOut.innerHTML=''; tech.textContent=''; return null; }
+  const freqs=naturalFrequencies(totalMM,pipe); const selectedMode=closestMode(fNat,freqs); const mode=selectedMode?selectedMode.mode:1; const zones=getBlocked(totalMM); const loc=chooseLocation(totalMM,mode,zones); const section=getLineSection(loc.recommended,totalMM); const currentRisk=assessResonanceRisk(fNat); const operatingRisk=fOp>0?assessResonanceRisk(fOp):null; const mu=severityMassRatio(vRms,currentRisk); const candidates=[0.05,0.10,0.15].map(m=>{const mass=pipe.modalMass*m; const fPred=fNat*Math.sqrt(pipe.modalMass/(pipe.modalMass+mass)); const risk=assessResonanceRisk(fPred); return {mu:m,massG:mass*1000,fPred,risk,isRecommended:Math.abs(m-mu)<1e-9};}); const rec=candidates.find(c=>c.isRecommended); const bc=calibrateBoundaryCondition(fNat,mode,totalMM,pipe);
+  final.className='final';
+  final.textContent=`Recommended ring mass: ${fmt(rec.massG,1)} g -> use ${Math.round(rec.massG/5)*5} g practical first ring\n`+
+    `Recommended placement: ${section.name} of the discharge line\n`+
+    `${section.name} range: ${fmt(section.startMM,1)} mm to ${fmt(section.endMM,1)} mm along the total discharge line (${fmt(section.startInch,2)} inch to ${fmt(section.endInch,2)} inch)\n`+
+    `Exact calculated location: ${fmt(loc.recommended,1)} mm along the total discharge line (${fmt(toInch(loc.recommended),2)} inch)\n`+
+    `Measured natural frequency used: ${fmt(fNat,2)} Hz\n`+
+    `Calculated screening natural frequency: f${mode} = ${fmt(selectedMode.f,2)} Hz\n`+
+    `Current resonance risk: ${currentRisk.text}\n`+
+    `After-ring resonance risk: ${rec.risk.text}`;
+  cards.innerHTML=`<div class="card"><b>Mass</b><span class="value">${fmt(rec.massG,1)} g</span><br><span class="muted">Practical: ${Math.round(rec.massG/5)*5} g</span></div><div class="card"><b>Placement</b><span class="value">${section.name}</span><br><span class="muted">${fmt(loc.recommended,1)} mm (${fmt(toInch(loc.recommended),2)} in) along the total discharge line</span></div><div class="card"><b>Risk Now</b><span class="value ${currentRisk.cls}">${currentRisk.level}</span><br><span class="muted">Natural frequency vs motor harmonics</span></div><div class="card"><b>Risk After Ring</b><span class="value ${rec.risk.cls}">${rec.risk.level}</span><br><span class="muted">Predicted natural frequency = ${fmt(rec.fPred,2)} Hz</span></div>`;
+  let mhtml='<div class="table-wrap"><table><thead><tr><th>Candidate</th><th>Ring Mass</th><th>Predicted Natural Frequency After Ring</th><th>Resonance Risk After Ring</th></tr></thead><tbody>'; for(const c of candidates){mhtml+=`<tr class="${c.isRecommended?'recommended':''}"><td>${fmt(c.mu*100,0)}%${c.isRecommended?' selected':''}</td><td>${fmt(c.massG,1)} g</td><td>${fmt(c.fPred,2)} Hz</td><td class="${c.risk.cls}">${c.risk.text}</td></tr>`;} mhtml+='</tbody></table></div>'; massOut.innerHTML=mhtml;
+  const fLines=freqs.map(fr=>`f${fr.mode} = ${fmt(fr.f,2)} Hz`).join('\n'); const zonesText=zones.length?zones.map(z=>`${z.type}: ${fmt(z.start,1)} to ${fmt(z.end,1)} mm (${fmt(toInch(z.start),2)} to ${fmt(toInch(z.end),2)} inch)`).join('\n'):'No blocked zones entered.';
+  tech.textContent=`Engineering calculation record\n\nFull line length = ${fmt(totalMM,1)} mm = ${fmt(toInch(totalMM),2)} inch\nPipe OD = ${fmt(pipe.ODmm,3)} mm\nWall thickness = ${fmt(pipe.tmm,3)} mm\nPipe ID = ${fmt(pipe.IDmm,3)} mm\nMass per meter = ${fmt(pipe.mPrime,4)} kg/m\nFull pipe mass = ${fmt(pipe.totalMass,5)} kg\nModal mass used = 0.5 x full pipe mass = ${fmt(pipe.modalMass,5)} kg\n\nCalculated screening natural frequencies, full line no-support method:\n${fLines}\n\nMeasured natural frequency = ${fmt(fNat,2)} Hz\nOperating dominant frequency = ${fOp>0?fmt(fOp,2)+' Hz':'not entered'}\nCompressor speed = ${fmt(toHz(val('compSpeed'),text('compSpeedUnit')),2)} Hz (${text('compSpeedUnit')==='RPM'?fmt(val('compSpeed'),0)+' RPM':fmt(val('compSpeed'),2)+' Hz'})\nClosest calculated mode = mode ${mode}\nEffective boundary eigenvalue from measured natural frequency = ${bc?fmt(bc.lambdaEff,3):'not calculated'}\nClosest textbook boundary behavior = ${bc?bc.closestBC:'not calculated'}\n\nAntinode target before blocked-zone movement = ${fmt(loc.targetAntinode,1)} mm (${fmt(toInch(loc.targetAntinode),2)} inch) along the total discharge line\nRecommended placement section = ${section.name}\n${section.name} range = ${fmt(section.startMM,1)} mm to ${fmt(section.endMM,1)} mm (${fmt(section.startInch,2)} inch to ${fmt(section.endInch,2)} inch) along the total discharge line\nFinal safe location = ${fmt(loc.recommended,1)} mm (${fmt(toInch(loc.recommended),2)} inch) along the total discharge line\nMovement due to U-trap/braze/bend avoidance = ${fmt(loc.moved,1)} mm\n\nBlocked zones used internally:\n${zonesText}\n\nCurrent natural-frequency resonance risk:\n${currentRisk.text}\n${operatingRisk?`\nOperating peak relation to harmonics:\n${operatingRisk.text}\n`:''}`;
+  const fAfter=val('fNaturalAfter'), vAfter=val('vRmsAfter'); if(fAfter>0||vAfter>0){let lines=[]; if(fAfter>0) lines.push(`Natural frequency after ring: ${fmt(fNat,2)} Hz -> ${fmt(fAfter,2)} Hz. Risk after measured result: ${assessResonanceRisk(fAfter).text}`); if(vAfter>0&&vRms>0) lines.push(`RMS vibration: ${fmt(vRms,2)} mm/s -> ${fmt(vAfter,2)} mm/s (${fmt((vRms-vAfter)/vRms*100,1)}% reduction).`); validation.textContent=lines.join('\n');} else validation.textContent='No after-ring validation entered yet.';
+  lastRecord={savedAt:new Date().toISOString(),unitNumber:text('unitNumber'),unitModel:text('unitModel'),testDate:text('testDate'),testerName:text('testerName'),lineLengthMM:totalMM,pipeODmm:pipe.ODmm,wallThicknessMM:pipe.tmm,naturalFrequencyMeasuredHz:fNat,operatingDominantFrequencyHz:fOp,compressorSpeedHz:toHz(val('compSpeed'),text('compSpeedUnit')),vRmsMMs:vRms,peakVelocityMMs:val('vPeak'),displacement:val('disp'),displacementUnit:text('dispUnit'),recommendedMassG:rec.massG,recommendedPlacementSection:section.name,recommendedSectionNumber:section.section,recommendedSectionStartMM:section.startMM,recommendedSectionEndMM:section.endMM,recommendedSectionStartInch:section.startInch,recommendedSectionEndInch:section.endInch,recommendedLocationAlongLineMM:loc.recommended,recommendedLocationAlongLineInch:toInch(loc.recommended),currentResonanceRisk:currentRisk.level,afterRingPredictedFrequencyHz:rec.fPred,afterRingRisk:rec.risk.level,selectedMode:mode}; return lastRecord;
+}
+function saveUnit(){ const r=calculateRecommendation(); if(!r) return; if(!r.unitNumber){alert('Enter unit number before saving.'); return;} let records=[]; try{records=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')}catch(e){records=[]} records.push(r); localStorage.setItem(STORAGE_KEY,JSON.stringify(records)); alert('Saved unit: '+r.unitNumber); }
+function downloadCSV(){ let records=[]; try{records=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')}catch(e){records=[]} if(!records.length){alert('No saved records yet.'); return;} const headers=Object.keys(records[0]); const rows=records.map(r=>headers.map(h=>`"${String(r[h]??'').replace(/"/g,'""')}"`).join(',')); const blob=new Blob([headers.join(',')+'\n'+rows.join('\n')],{type:'text/csv'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='rubber_mass_ring_saved_units_v11.csv'; a.click(); URL.revokeObjectURL(url); }
+function clearSaved(){ if(confirm('Clear all saved unit records?')){localStorage.removeItem(STORAGE_KEY); alert('Saved data cleared.');} }
+function init(){ const today=new Date().toISOString().split('T')[0]; setVal('testDate',today); addBlockedRow(); toggleVfdMax(); }
+init();
+</script>
+</body>
+</html>
