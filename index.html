@@ -126,7 +126,7 @@ This version uses the full discharge line length entered by the worker. It does 
 
 <h2>Saved Unit Records</h2>
 <div class="grid">
-  <div><label>Search Saved Units</label><input id="savedRecordSearch" list="savedRecordOptions" placeholder="Type serial, model, or saved date" onchange="syncSavedRecordInputs('search')"></div>
+  <div><label>Search Saved Units</label><input id="savedRecordSearch" list="savedRecordOptions" onchange="syncSavedRecordInputs('search')"></div>
   <div><label>Saved Unit Dropdown</label><select id="savedRecordSelect" onchange="syncSavedRecordInputs('select')"><option value="">Select a saved unit</option></select></div>
   <div><label>Load Saved Unit</label><button type="button" class="secondary" onclick="loadSelectedSavedRecord()">Load Selected Unit</button></div>
 </div>
@@ -136,31 +136,31 @@ This version uses the full discharge line length entered by the worker. It does 
 <h2>1. Unit Information</h2>
 <div class="grid">
   <div><label>Load Saved Model Template</label><select id="savedPreset" onchange="applySavedPreset()"><option value="">Manual entry / no template</option><option value="PAC-120H">PAC-120H - Packaged Unit 120H</option><option value="APMR51120G1">APMR51120G1</option></select></div>
-  <div><label>Model Number</label><input id="modelNumber" type="text" autocomplete="off" spellcheck="false" oninput="setVal('savedPreset','')" onblur="applyModelFromNumber()" placeholder="Example: PAC-120H"><div class="field-help">Used to load the saved model template.</div></div>
-  <div><label>Unit Serial Number</label><input id="unitSerialNumber" type="text" autocomplete="off" spellcheck="false" placeholder="Example: P00000000012345"><div class="field-help">Specific serial number of the tested machine/unit.</div></div>
+  <div><label>Model Number</label><input id="modelNumber" type="text" autocomplete="off" spellcheck="false" oninput="setVal('savedPreset','')" onblur="applyModelFromNumber()"><div class="field-help">Used to load the saved model template.</div></div>
+  <div><label>Unit Serial Number</label><input id="unitSerialNumber" type="text" autocomplete="off" spellcheck="false"><div class="field-help">Specific serial number of the tested machine/unit.</div></div>
   <div><label>Date</label><input id="testDate" type="date"></div>
-  <div><label>Tester Name</label><input id="testerName" placeholder="Tester name"></div>
+  <div><label>Tester Name</label><input id="testerName"></div>
 </div>
 
 <h2>2. Discharge Line Inputs</h2>
 <div class="grid">
-  <div><label>Total Discharge Line Length</label><input id="lineLength" type="number" step="any" placeholder="Full line length"></div>
+  <div><label>Total Discharge Line Length</label><input id="lineLength" type="number" step="any"></div>
   <div><label>Length Unit</label><select id="lineUnit"><option value="mm">mm</option><option value="inch">inch</option><option value="m">m</option></select></div>
-  <div><label>Pipe Outside Diameter</label><input id="pipeOD" type="number" step="any" placeholder="Example: 7/8 or 22.225"></div>
+  <div><label>Pipe Outside Diameter</label><input id="pipeOD" type="number" step="any"></div>
   <div><label>OD Unit</label><select id="pipeODUnit"><option value="mm">mm</option><option value="inch">inch</option></select></div>
-  <div><label>Wall Thickness</label><input id="pipeT" type="number" step="any" placeholder="Example: 0.045 or 1.143"></div>
+  <div><label>Wall Thickness</label><input id="pipeT" type="number" step="any"></div>
   <div><label>Thickness Unit</label><select id="pipeTUnit"><option value="mm">mm</option><option value="inch">inch</option></select></div>
 </div>
 <div class="muted">Material constants used internally: copper density = 8940 kg/m^3, Young's modulus = 110 GPa.</div>
 
 <h2>3. Operating Conditions</h2>
 <div class="grid">
-  <div><label>Compressor Running Speed</label><input id="compSpeed" type="number" step="any" placeholder="Example: 700"></div>
+  <div><label>Compressor Running Speed</label><input id="compSpeed" type="number" step="any"></div>
   <div><label>Speed Unit</label><select id="compSpeedUnit"><option value="RPM">RPM</option><option value="Hz">Hz</option></select></div>
   <div><label>Speed Type</label><select id="compSpeedType" onchange="toggleVfdMax()"><option value="fixed">Fixed speed</option><option value="variable">Variable speed / VFD</option></select></div>
-  <div id="vfdMaxBox" class="hidden"><label>Maximum Speed for VFD</label><input id="compSpeedMax" type="number" step="any" placeholder="Same unit as running speed"></div>
-  <div><label>Pipe Surface Temp at Ring Location, deg C</label><input id="surfaceTemp" type="number" step="any" placeholder="Measured temperature"></div>
-  <div><label>Refrigerant Type</label><input id="refrigerant" placeholder="Example: R410A / R32"></div>
+  <div id="vfdMaxBox" class="hidden"><label>Maximum Speed for VFD</label><input id="compSpeedMax" type="number" step="any"></div>
+  <div><label>Pipe Surface Temp at Ring Location, deg C</label><input id="surfaceTemp" type="number" step="any"></div>
+  <div><label>Refrigerant Type</label><input id="refrigerant"></div>
 </div>
 
 <h2>4. Measurement Inputs</h2>
@@ -168,14 +168,14 @@ This version uses the full discharge line length entered by the worker. It does 
 Natural frequency is from the hammer/bump test. Operating dominant frequency is from the running compressor spectrum. The tool uses natural frequency for predicted frequency shift and resonance risk.
 </div>
 <div class="grid">
-  <div><label>Measured Natural Frequency, Hz</label><input id="fNaturalMeasured" type="number" step="any" placeholder="Example: 35"></div>
-  <div><label>Operating Dominant Frequency, Hz</label><input id="fOperating" type="number" step="any" placeholder="Example: 50"></div>
-  <div><label>Highest RMS Vibration, mm/s</label><input id="vRms" type="number" step="any" placeholder="Example: 11.94"></div>
-  <div><label>Peak Velocity, mm/s</label><input id="vPeak" type="number" step="any" placeholder="Example: 25"></div>
-  <div><label>Highest Displacement</label><input id="disp" type="number" step="any" placeholder="Example: 24.94"></div>
+  <div><label>Measured Natural Frequency, Hz</label><input id="fNaturalMeasured" type="number" step="any"></div>
+  <div><label>Operating Dominant Frequency, Hz</label><input id="fOperating" type="number" step="any"></div>
+  <div><label>Highest RMS Vibration, mm/s</label><input id="vRms" type="number" step="any"></div>
+  <div><label>Peak Velocity, mm/s</label><input id="vPeak" type="number" step="any"></div>
+  <div><label>Highest Displacement</label><input id="disp" type="number" step="any"></div>
   <div><label>Displacement Unit</label><select id="dispUnit"><option value="um">um</option><option value="mm">mm</option></select></div>
-  <div><label>Peak Location Name</label><input id="peakName" placeholder="Example: Location 5"></div>
-  <div><label>Peak Location Along Total Discharge Line</label><input id="peakLocation" type="number" step="any" placeholder="Example: 30"></div>
+  <div><label>Peak Location Name</label><input id="peakName"></div>
+  <div><label>Peak Location Along Total Discharge Line</label><input id="peakLocation" type="number" step="any"></div>
   <div><label>Peak Location Unit</label><select id="peakUnit"><option value="mm">mm</option><option value="inch">inch</option><option value="m">m</option></select></div>
 </div>
 
@@ -184,11 +184,11 @@ Natural frequency is from the hammer/bump test. Operating dominant frequency is 
 Enter the U-trap as three connected pipe pieces. Example for your case: after 4 inch along the total discharge line, the pipe goes 12 inch down, 3 inch left, and 7 inch up. The tool blocks this full U-trap zone automatically and adds clearance by itself.
 </div>
 <div class="grid">
-  <div><label>U-Trap Start Position Along Total Discharge Line</label><input id="utrapStart" type="number" step="any" placeholder="Example: 4"></div>
+  <div><label>U-Trap Start Position Along Total Discharge Line</label><input id="utrapStart" type="number" step="any"></div>
   <div><label>Start Unit</label><select id="utrapStartUnit"><option value="mm">mm</option><option value="inch">inch</option><option value="m">m</option></select></div>
-  <div><label>Piece 1 Length</label><input id="utrapP1" type="number" step="any" placeholder="Example: 12"></div>
-  <div><label>Piece 2 Length</label><input id="utrapP2" type="number" step="any" placeholder="Example: 3"></div>
-  <div><label>Piece 3 Length</label><input id="utrapP3" type="number" step="any" placeholder="Example: 7"></div>
+  <div><label>Piece 1 Length</label><input id="utrapP1" type="number" step="any"></div>
+  <div><label>Piece 2 Length</label><input id="utrapP2" type="number" step="any"></div>
+  <div><label>Piece 3 Length</label><input id="utrapP3" type="number" step="any"></div>
   <div><label>Piece Unit</label><select id="utrapPieceUnit"><option value="mm">mm</option><option value="inch">inch</option><option value="m">m</option></select></div>
   <div><label>Braze Location in U-Trap</label><select id="utrapBraze"><option value="none">No braze entered</option><option value="p1mid">Middle of Piece 1</option><option value="p2mid">Middle of Piece 2</option><option value="p3mid">Middle of Piece 3</option></select></div>
 </div>
@@ -217,8 +217,8 @@ Enter only bends or brazed joints outside the U-trap. Do not enter supports. The
 
 <h3>7c. Validation After Ring Installation</h3>
 <div class="grid">
-  <div><label>After-Ring Natural Frequency, Hz</label><input id="fNaturalAfter" type="number" step="any" placeholder="Hammer test after ring"></div>
-  <div><label>After-Ring RMS Vibration, mm/s</label><input id="vRmsAfter" type="number" step="any" placeholder="Running test after ring"></div>
+  <div><label>After-Ring Natural Frequency, Hz</label><input id="fNaturalAfter" type="number" step="any"></div>
+  <div><label>After-Ring RMS Vibration, mm/s</label><input id="vRmsAfter" type="number" step="any"></div>
 </div>
 <div id="validationOutput" class="details">No after-ring validation entered yet.</div>
 
@@ -370,7 +370,7 @@ function applyModelFromNumber(){
 function toggleVfdMax(){ el('vfdMaxBox').className = text('compSpeedType')==='variable' ? '' : 'hidden'; }
 function addBlockedRow(values={}){
   const tbody=document.querySelector('#blockedTable tbody'); const i=tbody.children.length; const row=document.createElement('tr');
-  row.innerHTML=`<td>${i+1}</td><td><select id="bType${i}"><option ${values.type==='Bend'?'selected':''}>Bend</option><option ${values.type==='Brazed joint'?'selected':''}>Brazed joint</option><option ${values.type==='Other blocked point'?'selected':''}>Other blocked point</option></select></td><td><input id="bPos${i}" type="number" step="any" value="${values.pos||''}" placeholder="Position"></td><td><select id="bUnit${i}"><option value="mm" ${values.unit==='mm'?'selected':''}>mm</option><option value="inch" ${values.unit==='inch'?'selected':''}>inch</option><option value="m" ${values.unit==='m'?'selected':''}>m</option></select></td><td><input id="bNote${i}" value="${values.note||''}" placeholder="Notes"></td>`;
+  row.innerHTML=`<td>${i+1}</td><td><select id="bType${i}"><option ${values.type==='Bend'?'selected':''}>Bend</option><option ${values.type==='Brazed joint'?'selected':''}>Brazed joint</option><option ${values.type==='Other blocked point'?'selected':''}>Other blocked point</option></select></td><td><input id="bPos${i}" type="number" step="any" value="${values.pos||''}"></td><td><select id="bUnit${i}"><option value="mm" ${values.unit==='mm'?'selected':''}>mm</option><option value="inch" ${values.unit==='inch'?'selected':''}>inch</option><option value="m" ${values.unit==='m'?'selected':''}>m</option></select></td><td><input id="bNote${i}" value="${values.note||''}"></td>`;
   tbody.appendChild(row);
 }
 function removeBlockedRow(){const tbody=document.querySelector('#blockedTable tbody'); if(tbody.children.length>0) tbody.removeChild(tbody.lastElementChild)}
