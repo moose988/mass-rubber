@@ -1,0 +1,17 @@
+{
+  "name": "daham-worker-tool",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "build": "node scripts/build-check.js",
+    "lint": "node scripts/source-check.js",
+    "typecheck": "node scripts/source-check.js",
+    "preview": "npx http-server . -p 4173 -c-1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.1",
+    "http-server": "^14.1.1"
+  }
+}
