@@ -550,11 +550,13 @@ function normalizeSavedRecord(record, source='local'){
   const unitSerialNumber = result.unitSerialNumber || record.unitSerialNumber || record.formData?.unitSerialNumber || '';
   const modelNumber = result.modelNumber || record.modelNumber || record.formData?.modelNumber || '';
   const savedAt = record.meta?.savedAt || result.savedAt || record.savedAt || '';
-  const id = record.id || record.localId || `${source}-${unitSerialNumber}-${modelNumber}-${savedAt}`;
+  const signature = `${unitSerialNumber}||${modelNumber}||${savedAt}`;
+  const id = record.id || record.localId || `${source}-${signature}`;
   return {
     ...record,
     result,
     id,
+    signature,
     source,
     unitSerialNumber,
     modelNumber,
@@ -617,7 +619,7 @@ function restoreSavedRecord(record){
 }
 
 function loadSelectedSavedRecord(){
-  const record = savedRecordOptionMap.get(txt('savedRecordSearch')) || savedRecordOptionMap.get(el('savedRecordSelect')?.value || '');
+  const record = savedRecordOptionMap.get(text('savedRecordSearch')) || savedRecordOptionMap.get(el('savedRecordSelect')?.value || '');
   if(!record){
     el('savedRecordStatus').textContent = 'Select a saved unit from the search box or dropdown first.';
     return;
@@ -638,7 +640,7 @@ async function refreshSavedRecordOptions(){
   const merged = [...firebaseRecords, ...localRecords];
   const seen = new Set();
   const deduped = merged.filter(record => {
-    const key = record.id || record.label;
+    const key = record.signature || record.label;
     if(seen.has(key)) return false;
     seen.add(key);
     return true;
