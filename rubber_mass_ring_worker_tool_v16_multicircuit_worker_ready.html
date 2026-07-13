@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -278,8 +278,6 @@ pre.details{
     <button class="bigbutton green" type="button" onclick="calculateAll()">Calculate Recommendation</button>
     <button class="amber" type="button" onclick="loadNewCircuitExample()">Load New Circuit Example</button>
     <button class="amber" type="button" onclick="loadTwoCircuitExample()">Load Two-Circuit Example</button>
-    <button class="secondary" type="button" onclick="savePipeDataForModel()">Save Pipe Data for This Model</button>
-    <button class="secondary" type="button" onclick="loadPipeDataForModel()">Load Saved Pipe Data for This Model</button>
     <button class="secondary" type="button" onclick="clearAllData()">Clear Form</button>
   </div>
 
@@ -290,10 +288,10 @@ pre.details{
 
   <h2>1. Unit Information</h2>
   <div class="grid">
-    <div><label>Unit Number</label><input id="unitNumber" placeholder="Example: P00012345"></div>
-    <div><label>Unit Model</label><input id="unitModel" placeholder="Example: PAC-120H" oninput="handleUnitModelInput()"></div>
+    <div><label>Unit Number</label><input id="unitNumber"></div>
+    <div><label>Unit Model</label><input id="unitModel" oninput="handleUnitModelInput()"></div>
     <div><label>Date</label><input id="testDate" type="date"></div>
-    <div><label>Tester Name</label><input id="testerName" placeholder="Tester name"></div>
+    <div><label>Tester Name</label><input id="testerName"></div>
   </div>
 
   <h2>2. Circuit Count</h2>
@@ -323,6 +321,8 @@ pre.details{
     <div><label>Wall Thickness</label><input id="pipeT" type="number" step="any"></div>
     <div><label>Thickness Unit</label><select id="pipeTUnit"><option value="mm">mm</option><option value="inch">inch</option></select></div>
     <div><label>Pipe Material</label><select id="pipeMaterial"><option value="copper">Copper</option></select></div>
+    <div><label>Save Pipe Data For This Model</label><button class="secondary" type="button" onclick="savePipeDataForModel()">Save Pipe Data for This Model</button></div>
+    <div><label>Load Saved Pipe Data For This Model</label><button class="secondary" type="button" onclick="loadPipeDataForModel()">Load Saved Pipe Data for This Model</button></div>
   </div>
   <details>
     <summary>Advanced Material Edit</summary>
@@ -332,6 +332,16 @@ pre.details{
     </div>
   </details>
   <div id="modelPipeStatus" class="muted">Copper defaults are loaded internally: density 8940 kg/m³ and Young's modulus 110 GPa.</div>
+
+  <h2>8. Operating Conditions</h2>
+  <div class="grid">
+    <div><label>Compressor Running Speed</label><input id="globalRunSpeed" type="number" step="any"></div>
+    <div><label>Speed Unit</label><select id="globalRunSpeedUnit" onchange="toggleGlobalSpeedType()"><option value="RPM">RPM</option><option value="Hz">Hz</option></select></div>
+    <div><label>Speed Type</label><select id="globalSpeedType" onchange="toggleGlobalSpeedType()"><option value="fixed">Fixed speed</option><option value="variable">Variable speed</option></select></div>
+    <div id="globalMaxSpeedWrap" class="hidden"><label>Max Speed If Variable</label><input id="globalRunSpeedMax" type="number" step="any"></div>
+    <div><label>Pipe Surface Temperature, °C</label><input id="globalSurfaceTemp" type="number" step="any"></div>
+    <div><label>Refrigerant Type</label><input id="globalRefrigerant"></div>
+  </div>
 
   <h2>4 to 10. Circuit Geometry, No-Place Data, and Measurements</h2>
   <div id="circuitsRoot"></div>
@@ -577,21 +587,15 @@ function buildCircuitGeometryBox(key, title){
 function buildMeasurementBox(i){
   return `
     <div class="panel">
-      <h4>Circuit ${i} — Operating Conditions and Measurement Inputs</h4>
+      <h4>Circuit ${i} — Measurement Inputs</h4>
       <div class="grid">
-        <div><label>Compressor Running Speed</label><input id="runSpeed_${i}" type="number" step="any"></div>
-        <div><label>Speed Unit</label><select id="runSpeedUnit_${i}" onchange="toggleSpeedType(${i})"><option value="RPM">RPM</option><option value="Hz">Hz</option></select></div>
-        <div><label>Speed Type</label><select id="speedType_${i}" onchange="toggleSpeedType(${i})"><option value="fixed">Fixed speed</option><option value="variable">Variable speed</option></select></div>
-        <div id="maxSpeedWrap_${i}" class="hidden"><label>Max Speed If Variable</label><input id="runSpeedMax_${i}" type="number" step="any"></div>
-        <div><label>Pipe Surface Temperature, °C</label><input id="surfaceTemp_${i}" type="number" step="any"></div>
-        <div><label>Refrigerant Type</label><input id="refrigerant_${i}" placeholder="Example: R410A"></div>
         <div><label>Measured Natural Frequency, Hz</label><input id="measuredFn_${i}" type="number" step="any"><div class="muted">From hammer or bump test. Used for resonance and mass-frequency shift.</div></div>
         <div><label>Operating Dominant Frequency, Hz</label><input id="operatingDom_${i}" type="number" step="any"><div class="muted">Recorded only. Not used for added-mass frequency shift.</div></div>
         <div><label>Highest RMS Vibration, mm/s</label><input id="highestRms_${i}" type="number" step="any"></div>
         <div><label>Peak Velocity, mm/s</label><input id="peakVelocity_${i}" type="number" step="any"></div>
         <div><label>Highest Displacement</label><input id="highestDisp_${i}" type="number" step="any"></div>
         <div><label>Displacement Unit</label><select id="dispUnit_${i}"><option value="um">µm</option><option value="mm">mm</option></select></div>
-        <div><label>Highest Vibration Location Name</label><input id="highestName_${i}" placeholder="Example: last braze"></div>
+        <div><label>Highest Vibration Location Name</label><input id="highestName_${i}"></div>
         <div><label>Highest Vibration Location Along Total Discharge Line</label><input id="highestPos_${i}" type="number" step="any"></div>
         <div><label>Location Unit</label><select id="highestPosUnit_${i}">${unitOptions("mm")}</select></div>
       </div>
@@ -607,9 +611,9 @@ function buildMeasurementBox(i){
   `;
 }
 
-function toggleSpeedType(i){
-  const visible = txt(`speedType_${i}`) === "variable";
-  show(`maxSpeedWrap_${i}`, visible);
+function toggleGlobalSpeedType(){
+  const visible = txt("globalSpeedType") === "variable";
+  show("globalMaxSpeedWrap", visible);
 }
 
 function renumberTable(selector){
@@ -808,12 +812,12 @@ function getMeasurementData(i){
   const brazeVmax = Math.max(brazeV || 0, brazeA || 0);
   show(`brazeWarning_${i}`, brazeVmax > BRAZE_TARGET);
   return {
-    runningSpeed: num(`runSpeed_${i}`),
-    runningUnit: txt(`runSpeedUnit_${i}`),
-    speedType: txt(`speedType_${i}`),
-    maxSpeed: num(`runSpeedMax_${i}`),
-    surfaceTemp: num(`surfaceTemp_${i}`),
-    refrigerant: txt(`refrigerant_${i}`),
+    runningSpeed: num("globalRunSpeed"),
+    runningUnit: txt("globalRunSpeedUnit"),
+    speedType: txt("globalSpeedType"),
+    maxSpeed: num("globalRunSpeedMax"),
+    surfaceTemp: num("globalSurfaceTemp"),
+    refrigerant: txt("globalRefrigerant"),
     measuredFn: num(`measuredFn_${i}`),
     operatingDominant: num(`operatingDom_${i}`),
     highestRms: num(`highestRms_${i}`),
@@ -1612,12 +1616,9 @@ function resetGeometry(key){
 }
 
 function resetMeasurements(i){
-  setVal(`runSpeedUnit_${i}`, "RPM");
-  setVal(`speedType_${i}`, "fixed");
   setVal(`dispUnit_${i}`, "um");
   setVal(`highestPosUnit_${i}`, "mm");
   setVal(`criticalBrazeUnit_${i}`, "mm");
-  toggleSpeedType(i);
 }
 
 function clearAllData(){
@@ -1634,9 +1635,16 @@ function clearAllData(){
   setVal("pipeMaterial", "copper");
   setVal("materialDensity", "8940");
   setVal("materialE", "110");
+  setVal("globalRunSpeed", "");
+  setVal("globalRunSpeedUnit", "RPM");
+  setVal("globalSpeedType", "fixed");
+  setVal("globalRunSpeedMax", "");
+  setVal("globalSurfaceTemp", "");
+  setVal("globalRefrigerant", "");
   renderCircuitEditors();
   resetGeometry("1");
   resetMeasurements(1);
+  toggleGlobalSpeedType();
   el("finalOutput").className = "final status-calc";
   el("finalOutput").textContent = "Fill the inputs, then press Calculate Recommendation.";
   el("summaryCards").innerHTML = "";
@@ -1665,12 +1673,6 @@ function applyCircuitGeometryExample(key, config){
 }
 
 function applyMeasurementExample(i, data){
-  setVal(`runSpeed_${i}`, data.runSpeed ?? "");
-  setVal(`runSpeedUnit_${i}`, data.runSpeedUnit || "RPM");
-  setVal(`speedType_${i}`, data.speedType || "fixed");
-  setVal(`runSpeedMax_${i}`, data.runSpeedMax ?? "");
-  setVal(`surfaceTemp_${i}`, data.surfaceTemp ?? "70");
-  setVal(`refrigerant_${i}`, data.refrigerant || "");
   setVal(`measuredFn_${i}`, data.measuredFn ?? "");
   setVal(`operatingDom_${i}`, data.operatingDom ?? "");
   setVal(`highestRms_${i}`, data.highestRms ?? "");
@@ -1684,7 +1686,6 @@ function applyMeasurementExample(i, data){
   setVal(`criticalBrazeUnit_${i}`, data.criticalBrazeUnit || "mm");
   setVal(`brazeVertical_${i}`, data.brazeVertical ?? "");
   setVal(`brazeAxial_${i}`, data.brazeAxial ?? "");
-  toggleSpeedType(i);
 }
 
 function loadNewCircuitExample(){
@@ -1695,6 +1696,12 @@ function loadNewCircuitExample(){
   setVal("pipeODUnit", "inch");
   setVal("pipeT", "0.045");
   setVal("pipeTUnit", "inch");
+  setVal("globalRunSpeed", "771");
+  setVal("globalRunSpeedUnit", "RPM");
+  setVal("globalSpeedType", "fixed");
+  setVal("globalSurfaceTemp", "70");
+  setVal("globalRefrigerant", "");
+  toggleGlobalSpeedType();
   applyCircuitGeometryExample("1", {
     totalLength: 1860,
     totalLengthUnit: "mm",
@@ -1720,10 +1727,6 @@ function loadNewCircuitExample(){
     ]
   });
   applyMeasurementExample(1, {
-    runSpeed:771,
-    runSpeedUnit:"RPM",
-    speedType:"fixed",
-    surfaceTemp:70,
     measuredFn:35,
     highestRms:39.23,
     peakVelocity:15.83,
@@ -1746,6 +1749,12 @@ function loadTwoCircuitExample(){
   setVal("pipeODUnit", "inch");
   setVal("pipeT", "0.045");
   setVal("pipeTUnit", "inch");
+  setVal("globalRunSpeed", "771");
+  setVal("globalRunSpeedUnit", "RPM");
+  setVal("globalSpeedType", "fixed");
+  setVal("globalSurfaceTemp", "70");
+  setVal("globalRefrigerant", "");
+  toggleGlobalSpeedType();
   renderCircuitEditors();
 
   applyCircuitGeometryExample("1", {
@@ -1771,7 +1780,6 @@ function loadTwoCircuitExample(){
     ]
   });
   applyMeasurementExample(1, {
-    runSpeed:771, runSpeedUnit:"RPM", speedType:"fixed", surfaceTemp:70,
     measuredFn:35, highestRms:39.23, peakVelocity:15.83, highestName:"critical braze", highestPos:1860,
     criticalBrazePos:1860, brazeVertical:39.23, brazeAxial:15.83
   });
@@ -1797,7 +1805,6 @@ function loadTwoCircuitExample(){
     ]
   });
   applyMeasurementExample(2, {
-    runSpeed:771, runSpeedUnit:"RPM", speedType:"fixed", surfaceTemp:70,
     measuredFn:32, highestRms:22, peakVelocity:11, highestName:"critical braze", highestPos:2100,
     criticalBrazePos:2100, brazeVertical:22, brazeAxial:11
   });
@@ -1813,12 +1820,18 @@ function init(){
   setVal("pipeMaterial", "copper");
   setVal("materialDensity", "8940");
   setVal("materialE", "110");
+  setVal("globalRunSpeedUnit", "RPM");
+  setVal("globalSpeedType", "fixed");
   renderCircuitEditors();
   resetGeometry("1");
   resetMeasurements(1);
+  toggleGlobalSpeedType();
 }
 
 init();
 </script>
 </body>
 </html>
+
+
+
