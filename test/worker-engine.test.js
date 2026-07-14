@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { calculateUnit, createInitialState, adjustCircuitCount, toMM, pressureToPa, mergeIntervals, isSerialLikeModel, clone } from '../src/worker-engine.js';
-import { memoryStorage, saveUnitRecord, loadUnitRecord } from '../src/worker-persistence.js';
+import { memoryStorage, saveUnitRecord, loadUnitRecord, exportSavedData, importSavedData } from '../src/worker-persistence.js';
 
 function baseState(count = 1) {
   let state = createInitialState(count);
@@ -134,6 +134,25 @@ test('TEST H - multicircuit save and reload', () => {
     assert.equal(c.uTraps[0].start, 100 + i);
     assert.equal(c.measurements[1].name, `Unique ${i}`);
   });
+});
+
+test('saved units can be exported and imported on another device', () => {
+  const laptopStorage = memoryStorage();
+  const phoneStorage = memoryStorage();
+  const state = baseState(1);
+  const out = calculateUnit(state);
+  const saved = saveUnitRecord(laptopStorage, out.state, out.results, () => true);
+  assert.equal(saved.saved, true);
+
+  const backup = exportSavedData(laptopStorage);
+  assert.equal(backup.unitRecords.length, 1);
+  const imported = importSavedData(phoneStorage, backup, () => true);
+  assert.equal(imported.imported, true);
+  assert.equal(imported.unitCount, 1);
+
+  const loaded = loadUnitRecord(phoneStorage, saved.record.id);
+  assert.equal(loaded.unitNumber, 'U-100');
+  assert.equal(loaded.unitModel, 'MR-900');
 });
 
 test('focused conversions, intervals, validation, variable bands, serial safeguard', () => {

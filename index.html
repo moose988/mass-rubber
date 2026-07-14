@@ -20,7 +20,7 @@
     button.secondary{background:#334155}
     button.green{background:var(--green)}
     button.danger{background:var(--red)}
-    .topbar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+    .topbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
     .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;background:var(--soft);border:1px solid #e4ebf3;border-radius:8px;padding:14px}
     .note,.warning,.error{border-radius:8px;padding:12px 14px;margin:12px 0}
     .note{background:#eff6ff;border:1px solid #bfdbfe}
@@ -54,8 +54,11 @@
       <button id="resetBtn" type="button">Reset Form</button>
       <button id="calculateBtn" type="button" class="green">Calculate Recommendation</button>
       <button id="saveBtn" type="button" class="secondary">Save Unit</button>
+      <button id="exportSavedBtn" type="button" class="secondary">Export Saved Units</button>
+      <button id="importSavedBtn" type="button" class="secondary">Import Saved Units</button>
     </div>
     <div id="status" class="muted"></div>
+    <input id="importSavedFile" type="file" accept="application/json,.json" hidden>
 
     <h2>Unit Information</h2>
     <div class="grid">
@@ -64,7 +67,7 @@
       <div><label for="date">Date</label><input id="date" type="date"></div>
       <div><label for="testerName">Tester Name</label><input id="testerName"></div>
       <div><label for="circuitCount">Number of Circuits</label><select id="circuitCount"><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
-      <div><label for="savedUnits">Saved Unit Reload</label><select id="savedUnits"><option value="">Select saved unit</option></select></div>
+      <div><label for="savedUnits">Saved Unit Reload</label><select id="savedUnits"><option value="">Select saved unit</option></select><div class="muted">Saved records stay on this browser. Export from this device and import on another device to see the same records there.</div></div>
     </div>
     <div id="sameGeometryBox" class="grid" style="margin-top:12px">
       <div>
@@ -85,7 +88,7 @@
 
   <script type="module">
     import { createInitialState, adjustCircuitCount, calculateUnit, buildEngineeringRecordText, toMM, isSerialLikeModel, assertNoBadVisibleValues } from './src/worker-engine.js';
-    import { saveUnitRecord, loadUnitRecord, listUnitRecords, getModelPipeData, saveModelPipeData } from './src/worker-persistence.js';
+    import { saveUnitRecord, loadUnitRecord, listUnitRecords, getModelPipeData, saveModelPipeData, exportSavedData, importSavedData } from './src/worker-persistence.js';
 
     let state = createInitialState(1);
     let lastResults = [];
@@ -328,8 +331,40 @@
       const out = calculateUnit(state);
       if (out.errors.length) { $('messages').innerHTML = `<div class="error">Fix these inputs first:\n- ${out.errors.map(esc).join('\n- ')}</div>`; return; }
       const saved = saveUnitRecord(localStorage, out.state, out.results, id => confirm(`Replace saved data for ${id}?`));
-      $('status').textContent = saved.saved ? `Saved unit ${saved.record.unitNumber} / ${saved.record.unitModel}.` : saved.reason;
+      $('status').textContent = saved.saved ? `Saved unit ${saved.record.unitNumber} / ${saved.record.unitModel} on this device. Export saved units to move it to another device.` : saved.reason;
       renderAll();
+    });
+    $('exportSavedBtn').addEventListener('click', () => {
+      const data = exportSavedData(localStorage);
+      if (!data.unitRecords.length && !Object.keys(data.modelPipeData || {}).length) {
+        $('status').textContent = 'No saved units or model pipe data to export on this device.';
+        return;
+      }
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `daham-saved-units-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+      $('status').textContent = `Exported ${data.unitRecords.length} saved unit${data.unitRecords.length === 1 ? '' : 's'}. Import this file on the other device.`;
+    });
+    $('importSavedBtn').addEventListener('click', () => {
+      $('importSavedFile').value = '';
+      $('importSavedFile').click();
+    });
+    $('importSavedFile').addEventListener('change', async e => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try {
+        const data = JSON.parse(await file.text());
+        const imported = importSavedData(localStorage, data, label => confirm(`Replace existing ${label}?`));
+        $('status').textContent = imported.imported ? `Imported ${imported.unitCount} saved unit${imported.unitCount === 1 ? '' : 's'} and ${imported.modelCount} model pipe record${imported.modelCount === 1 ? '' : 's'} on this device.` : imported.reason;
+        renderAll();
+      } catch {
+        $('status').textContent = 'Import failed. Choose a saved-units JSON export from this app.';
+      }
     });
     $('unitNumber').addEventListener('input', e => { state.unit.unitNumber = e.target.value; });
     $('unitModel').addEventListener('input', e => {
