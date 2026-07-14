@@ -88,7 +88,8 @@
 
   <script type="module">
     import { createInitialState, adjustCircuitCount, calculateUnit, buildEngineeringRecordText, toMM, isSerialLikeModel, assertNoBadVisibleValues } from './src/worker-engine.js';
-    import { saveUnitRecord, loadUnitRecord, listUnitRecords, getModelPipeData, saveModelPipeData, exportSavedData, importSavedData } from './src/worker-persistence.js';
+    import { exportSavedData, importSavedData } from './src/worker-persistence.js';
+    import { getCloudPersistenceStatus, getModelPipeData, listUnitRecords, loadUnitRecord, saveModelPipeData, saveUnitRecord, warmCloudPersistence } from './src/cloud-persistence.js';
 
     let state = createInitialState(1);
     let lastResults = [];
@@ -104,7 +105,7 @@
       return `<div><label for="${id}">${label}</label><select id="${id}">${options.map(o => `<option value="${esc(o.value)}" ${o.value === value ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select></div>`;
     }
 
-    function renderUnit() {
+    async function renderUnit() {
       $('unitNumber').value = state.unit.unitNumber;
       $('unitModel').value = state.unit.unitModel;
       $('date').value = state.unit.date;
@@ -113,7 +114,7 @@
       $('sameGeometryBox').style.display = state.unit.circuitCount > 1 ? 'grid' : 'none';
       $('sameGeometry').value = state.sameGeometry;
       $('modelNotice').textContent = '';
-      const saved = listUnitRecords(localStorage);
+      const saved = await listUnitRecords(localStorage);
       $('savedUnits').innerHTML = '<option value="">Select saved unit</option>' + saved.map(r => `<option value="${esc(r.id)}">${esc(r.unitNumber)} / ${esc(r.unitModel)} / ${esc(r.date || '')}</option>`).join('');
     }
 
@@ -238,8 +239,8 @@
       }
     }
 
-    function renderAll() {
-      renderUnit();
+    async function renderAll() {
+      await renderUnit();
       renderPipe();
       renderCircuits();
       bindDynamic();
@@ -327,11 +328,16 @@
 
     $('resetBtn').addEventListener('click', () => { state = createInitialState(1); lastResults = []; $('results').innerHTML = ''; $('messages').innerHTML = ''; renderAll(); });
     $('calculateBtn').addEventListener('click', calculate);
-    $('saveBtn').addEventListener('click', () => {
+    $('saveBtn').addEventListener('click', async () => {
       const out = calculateUnit(state);
       if (out.errors.length) { $('messages').innerHTML = `<div class="error">Fix these inputs first:\n- ${out.errors.map(esc).join('\n- ')}</div>`; return; }
-      const saved = saveUnitRecord(localStorage, out.state, out.results, id => confirm(`Replace saved data for ${id}?`));
-      $('status').textContent = saved.saved ? `Saved unit ${saved.record.unitNumber} / ${saved.record.unitModel} on this device. Export saved units to move it to another device.` : saved.reason;
+      $('status').textContent = 'Saving unit...';
+      const saved = await saveUnitRecord(localStorage, out.state, out.results, id => confirm(`Replace saved data for ${id}?`));
+      $('status').textContent = saved.saved
+        ? saved.cloudSaved
+          ? `Saved unit ${saved.record.unitNumber} / ${saved.record.unitModel} to Firebase.`
+          : `Saved unit ${saved.record.unitNumber} / ${saved.record.unitModel} on this device. ${saved.cloudReason || 'Firebase is not configured.'}`
+        : saved.reason;
       renderAll();
     });
     $('exportSavedBtn').addEventListener('click', () => {
@@ -367,18 +373,18 @@
       }
     });
     $('unitNumber').addEventListener('input', e => { state.unit.unitNumber = e.target.value; });
-    $('unitModel').addEventListener('input', e => {
+    $('unitModel').addEventListener('input', async e => {
       state.unit.unitModel = e.target.value;
       $('modelNotice').textContent = isSerialLikeModel(e.target.value) ? 'This looks like a serial identifier, not a model number.' : '';
-      const saved = getModelPipeData(localStorage, e.target.value);
+      const saved = await getModelPipeData(localStorage, e.target.value);
       if (saved && confirm(`Saved pipe data exists for ${e.target.value}. Load it now?`)) { state.pipe = saved; renderAll(); }
     });
     $('date').addEventListener('input', e => { state.unit.date = e.target.value; });
     $('testerName').addEventListener('input', e => { state.unit.testerName = e.target.value; });
     $('circuitCount').addEventListener('change', e => { state = adjustCircuitCount(state, e.target.value); renderAll(); });
     $('sameGeometry').addEventListener('change', e => { state.sameGeometry = e.target.value; renderAll(); });
-    $('savedUnits').addEventListener('change', e => {
-      const record = loadUnitRecord(localStorage, e.target.value);
+    $('savedUnits').addEventListener('change', async e => {
+      const record = await loadUnitRecord(localStorage, e.target.value);
       if (!record) return;
       state = { schemaVersion: record.schemaVersion, unit: record.unit, sameGeometry: record.sameGeometry, pipe: record.modelPipeData, circuits: record.circuits };
       lastResults = record.recommendations || [];
@@ -389,6 +395,11 @@
       if (state.unit.unitModel && !isSerialLikeModel(state.unit.unitModel)) saveModelPipeData(localStorage, state.unit.unitModel, state.pipe, () => false);
     });
     renderAll();
+    warmCloudPersistence().then(status => {
+      if (!$('status').textContent && status.enabled) $('status').textContent = 'Firebase sync connected.';
+      if (!$('status').textContent && !status.enabled) $('status').textContent = getCloudPersistenceStatus().reason;
+      renderAll();
+    });
   </script>
 </body>
 </html>
