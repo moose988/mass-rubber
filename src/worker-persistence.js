@@ -106,6 +106,43 @@ export function loadUnitRecord(storage, id) {
   return record ? clone(record) : null;
 }
 
+export function exportSavedData(storage) {
+  const modelPipeData = readJson(storage, MODEL_PIPE_KEY, {});
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    exportedAt: new Date().toISOString(),
+    unitRecords: listUnitRecords(storage),
+    modelPipeData
+  };
+}
+
+export function importSavedData(storage, payload, confirmReplace = () => true) {
+  if (!payload || payload.schemaVersion !== SCHEMA_VERSION) return { imported: false, reason: 'Backup file is not compatible with this app version.' };
+  const incomingRecords = Array.isArray(payload.unitRecords) ? payload.unitRecords.filter(r => r.schemaVersion === SCHEMA_VERSION && r.id) : [];
+  const currentRecords = listUnitRecords(storage);
+  const recordMap = new Map(currentRecords.map(r => [r.id, r]));
+  let unitCount = 0;
+  for (const record of incomingRecords) {
+    if (recordMap.has(record.id) && !confirmReplace(`unit ${record.unitNumber} / ${record.unitModel}`)) continue;
+    recordMap.set(record.id, clone(record));
+    unitCount += 1;
+  }
+
+  const currentModels = readJson(storage, MODEL_PIPE_KEY, {});
+  const incomingModels = payload.modelPipeData && typeof payload.modelPipeData === 'object' ? payload.modelPipeData : {};
+  let modelCount = 0;
+  for (const [model, record] of Object.entries(incomingModels)) {
+    if (!record || record.schemaVersion !== SCHEMA_VERSION) continue;
+    if (currentModels[model] && !confirmReplace(`model pipe data for ${model}`)) continue;
+    currentModels[model] = clone(record);
+    modelCount += 1;
+  }
+
+  writeJson(storage, UNIT_RECORDS_KEY, [...recordMap.values()]);
+  writeJson(storage, MODEL_PIPE_KEY, currentModels);
+  return { imported: true, unitCount, modelCount };
+}
+
 export function memoryStorage() {
   const data = new Map();
   return {
