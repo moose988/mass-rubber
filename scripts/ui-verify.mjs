@@ -33,7 +33,6 @@ async function fillCircuitOne() {
   for (let i = 0; i < rows.length; i++) {
     await page.fill(`input[data-ci="0"][data-ri="${i}"][data-field="length"]`, String(rows[i]));
     await page.selectOption(`select[data-ci="0"][data-ri="${i}"][data-field="unit"]`, 'inch');
-    if (i === 0) await page.selectOption(`select[data-ci="0"][data-ri="${i}"][data-field="feature"]`, 'compressor');
     if (i === rows.length - 1) await page.selectOption(`select[data-ci="0"][data-ri="${i}"][data-field="feature"]`, 'condenser');
   }
   await page.fill('#op_0_speed', '700');
@@ -44,7 +43,7 @@ async function fillCircuitOne() {
   await page.fill('#op_0_highestLocationDistance', '24');
   await page.selectOption('#op_0_highestLocationUnit', 'inch');
   await page.click('button[data-action="add-measurement"][data-ci="0"]');
-  await page.fill('input[data-ci="0"][data-mi="0"][data-m="name"]', 'Endpoint braze');
+  await page.selectOption('select[data-ci="0"][data-mi="0"][data-m="name"]', 'Final braze');
   await page.fill('input[data-ci="0"][data-mi="0"][data-m="distance"]', '49.25');
   await page.selectOption('select[data-ci="0"][data-mi="0"][data-m="unit"]', 'inch');
   await page.fill('input[data-ci="0"][data-mi="0"][data-m="vertical"]', '4.5');

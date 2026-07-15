@@ -1,10 +1,25 @@
 export const SCHEMA_VERSION = 2;
 export const BRAZE_TARGET_MM_S = 5;
-export const CLEARANCE_MM = 30;
+export const ENGINEERING_CONFIG_VERSION = 'geometry-clearance-v3';
+export const ENGINEERING_CONFIG = Object.freeze({
+  version: ENGINEERING_CONFIG_VERSION,
+  featureClearanceMM: 30,
+  ringGapMM: 10,
+  candidateGridMM: 5,
+  manualTotalTolerancePercent: 2,
+  resonanceBandsPercent: { critical: 5, high: 10, medium: 15 }
+});
+export const CLEARANCE_MM = ENGINEERING_CONFIG.featureClearanceMM;
 const G = 9.80665;
 const COPPER = { density: 8940, young: 110e9, poisson: 0.34 };
 const LAMBDAS = [Math.PI, 2 * Math.PI, 3 * Math.PI];
 const MASS_RATIOS = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50];
+export const DIRECTION_OPTIONS = ['Right', 'Left', 'Up', 'Down', 'Diagonal'];
+export const RING_STOCK = Object.freeze([
+  { massG: 130, widthMM: 38, outsideDimensions: '38 mm axial width field ring', pipeODRangeMM: [6, 35], rubberType: 'High-temperature rubber', temperatureRatingC: 120, inventoryStatus: 'active' },
+  { massG: 215, widthMM: 48, outsideDimensions: '48 mm axial width field ring', pipeODRangeMM: [6, 35], rubberType: 'High-temperature rubber', temperatureRatingC: 120, inventoryStatus: 'active' },
+  { massG: 330, widthMM: 58, outsideDimensions: '58 mm axial width field ring', pipeODRangeMM: [6, 35], rubberType: 'High-temperature rubber', temperatureRatingC: 120, inventoryStatus: 'active' }
+]);
 const FEATURES = {
   none: 'None',
   bend: 'Bend',
@@ -24,7 +39,8 @@ export function toMM(value, unit = 'mm') {
   if (!Number.isFinite(n)) return NaN;
   if (unit === 'inch') return n * 25.4;
   if (unit === 'm') return n * 1000;
-  return n;
+  if (unit === 'mm') return n;
+  return NaN;
 }
 
 export function pressureToPa(value, unit = 'psi') {
@@ -49,7 +65,7 @@ export function isSerialLikeModel(value) {
 export function defaultCircuit(index = 0) {
   return {
     id: `circuit-${index + 1}`,
-    route: [{ length: '', unit: 'mm', direction: 'Straight', feature: index === 0 ? 'compressor' : 'none', notes: '' }],
+    route: [{ number: 1, length: '', unit: 'mm', direction: 'Right', feature: 'none', notes: '' }],
     manualTotal: '',
     manualTotalUnit: 'mm',
     uTraps: [],
@@ -132,6 +148,31 @@ function routeLengthMM(route) {
   return route.reduce((sum, row) => sum + toMM(row.length, row.unit), 0);
 }
 
+export function calculateRouteTotalMM(route) {
+  return routeLengthMM(route || []);
+}
+
+function routeSections(route) {
+  let pos = 0;
+  return (route || []).map((row, i) => {
+    const lengthMM = toMM(row.length, row.unit);
+    const startMM = pos;
+    const endMM = pos + lengthMM;
+    pos = endMM;
+    return { segment: i + 1, number: Number(row.number || i + 1), direction: row.direction, feature: row.feature || 'none', notes: row.notes || '', startMM, endMM, lengthMM };
+  });
+}
+
+function dedupePoints(points) {
+  const out = [];
+  for (const p of points.filter(p => Number.isFinite(p.x))) {
+    const x = Math.round(p.x * 1000) / 1000;
+    const existing = out.find(item => Math.round(item.x * 1000) / 1000 === x && (item.type === p.type || ['bend', 'utrap-bend'].includes(item.type) && ['bend', 'utrap-bend'].includes(p.type)));
+    if (!existing) out.push(p);
+  }
+  return out.sort((a, b) => a.x - b.x);
+}
+
 function pipeCalculations(pipe, lengthMM) {
   const errors = [];
   const Do = toMM(pipe.od, pipe.odUnit) / 1000;
@@ -150,20 +191,53 @@ function pipeCalculations(pipe, lengthMM) {
   return { errors, Do, t, Di, area, I, density, young, poisson: finite(pipe.poisson, COPPER.poisson), mPrime, totalMass: mPrime * L, modalMass: 0.5 * mPrime * L, L };
 }
 
-function routeFeatures(route, totalMM) {
+export function routeFeatures(route, totalMM) {
   const points = [{ x: 0, type: 'compressor', label: FEATURES.compressor, segment: 1 }];
   let pos = 0;
   route.forEach((row, i) => {
     pos += toMM(row.length, row.unit);
     const type = row.feature || 'none';
-    if (type !== 'none') points.push({ x: Math.min(pos, totalMM), type, label: FEATURES[type] || FEATURES.other, segment: i + 1 });
+    if (type !== 'none' && type !== 'compressor') points.push({ x: Math.min(pos, totalMM), type, label: FEATURES[type] || FEATURES.other, segment: i + 1 });
   });
-  return points;
+  return dedupePoints(points);
 }
 
-function uTrapFeatures(uTraps, totalMM) {
+function segmentSelectedUTrapFeatures(trap, sections, totalMM) {
+  const selected = (trap.segments || trap.segmentNumbers || []).map(Number).filter(Number.isFinite);
+  if (selected.length !== 3) return null;
+  const sorted = [...selected].sort((a, b) => a - b);
+  if (sorted[1] !== sorted[0] + 1 || sorted[2] !== sorted[1] + 1) return null;
+  const pieces = sorted.map(n => sections.find(s => s.number === n || s.segment === n));
+  if (pieces.some(p => !p)) return null;
+  const start = pieces[0].startMM;
+  const p1 = pieces[0].lengthMM;
+  const p2 = pieces[1].lengthMM;
+  const p3 = pieces[2].lengthMM;
+  return {
+    start,
+    p1,
+    p2,
+    p3,
+    selectedSegments: sorted,
+    points: [
+      { x: start, type: 'utrap-start', label: 'U-trap start', segment: pieces[0].segment },
+      { x: start + p1, type: 'utrap-bend', label: 'U-trap bend', segment: pieces[0].segment },
+      { x: start + p1 + p2, type: 'utrap-bend', label: 'U-trap bend', segment: pieces[1].segment },
+      { x: start + p1 + p2 + p3, type: 'utrap-bend', label: 'U-trap bend', segment: pieces[2].segment },
+      { x: start + p1 / 2, type: 'braze', label: FEATURES.braze, segment: pieces[0].segment }
+    ].filter(p => p.x >= 0 && p.x <= totalMM)
+  };
+}
+
+export function uTrapFeatures(uTraps, totalMM, route = []) {
   const points = [];
+  const sections = routeSections(route);
   for (const trap of uTraps || []) {
+    const synced = segmentSelectedUTrapFeatures(trap, sections, totalMM);
+    if (synced) {
+      points.push(...synced.points);
+      continue;
+    }
     const start = toMM(trap.start, trap.unit);
     const p1 = toMM(trap.p1, trap.unit);
     const p2 = toMM(trap.p2, trap.unit);
@@ -177,7 +251,7 @@ function uTrapFeatures(uTraps, totalMM) {
     if (trap.braze === 'custom') braze = start + toMM(trap.customBrazeOffset, trap.unit);
     if (Number.isFinite(braze) && braze >= 0 && braze <= totalMM) points.push({ x: braze, type: 'braze', label: FEATURES.braze });
   }
-  return points;
+  return dedupePoints(points);
 }
 
 export function mergeIntervals(intervals) {
@@ -193,15 +267,16 @@ export function mergeIntervals(intervals) {
   return merged;
 }
 
-function blockedIntervals(points, totalMM) {
+export function blockedIntervals(points, totalMM, ringWidthMM = 0) {
+  const halfWidth = ringWidthMM / 2;
   return mergeIntervals(points.map(p => ({
-    start: Math.max(0, p.x - CLEARANCE_MM),
-    end: Math.min(totalMM, p.x + CLEARANCE_MM),
+    start: Math.max(0, p.x - CLEARANCE_MM - halfWidth),
+    end: Math.min(totalMM, p.x + CLEARANCE_MM + halfWidth),
     label: `${p.label} at ${round(p.x, 1)} mm`
   })));
 }
 
-function safeIntervals(blocked, totalMM) {
+export function safeIntervals(blocked, totalMM) {
   let cursor = 0;
   const safe = [];
   for (const b of blocked) {
@@ -222,6 +297,50 @@ function nearestSafe(x, safe) {
     const candidate = Math.max(s.start, Math.min(s.end, x));
     const d = Math.abs(candidate - x);
     if (!best || d < best.distance) best = { x: candidate, distance: d, interval: s };
+  }
+  return best;
+}
+
+function featureClearanceAtBoundary(boundary, points) {
+  return points.some(p => Math.abs(p.x - boundary) < 1e-6) ? CLEARANCE_MM : 0;
+}
+
+export function usableStraightIntervals(route, points, ringWidthMM) {
+  if (!(ringWidthMM > 0)) return [];
+  const halfWidth = ringWidthMM / 2;
+  return routeSections(route).map(section => {
+    const cStart = featureClearanceAtBoundary(section.startMM, points);
+    const cEnd = featureClearanceAtBoundary(section.endMM, points);
+    return {
+      start: section.startMM + cStart + halfWidth,
+      end: section.endMM - cEnd - halfWidth,
+      segment: section.segment,
+      direction: section.direction,
+      section
+    };
+  }).filter(i => i.end >= i.start);
+}
+
+function validCenterIntervals(route, points, totalMM, ringWidthMM) {
+  const straight = usableStraightIntervals(route, points, ringWidthMM);
+  const centerSafe = safeIntervals(blockedIntervals(points, totalMM, ringWidthMM), totalMM);
+  const intervals = [];
+  for (const s of straight) {
+    for (const c of centerSafe) {
+      const start = Math.max(s.start, c.start);
+      const end = Math.min(s.end, c.end);
+      if (end >= start) intervals.push({ ...s, start, end });
+    }
+  }
+  return intervals;
+}
+
+function nearestUsableCenter(x, intervals) {
+  let best = null;
+  for (const interval of intervals) {
+    const candidate = Math.max(interval.start, Math.min(interval.end, x));
+    const distance = Math.abs(candidate - x);
+    if (!best || distance < best.distance) best = { x: candidate, distance, interval };
   }
   return best;
 }
@@ -253,7 +372,8 @@ function harmonicRisk(frequency, operating) {
       const ref = frequency < lo ? lo : hi;
       separationPercent = Math.abs(frequency - ref) / ref * 100;
     }
-    const risk = separationPercent < 5 ? 'Critical' : separationPercent < 10 ? 'High' : separationPercent < 20 ? 'Medium' : 'Low';
+    const bands = ENGINEERING_CONFIG.resonanceBandsPercent;
+    const risk = separationPercent < bands.critical ? 'Critical' : separationPercent < bands.high ? 'High' : separationPercent < bands.medium ? 'Medium' : 'Low';
     const h = { order, frequencyHz: speedType === 'variable' ? null : lo, bandHz: speedType === 'variable' ? [lo, hi] : null, separationPercent, risk };
     harmonics.push(h);
     if (!nearest || h.separationPercent < nearest.separationPercent) nearest = h;
@@ -273,10 +393,10 @@ function routeSection(x, route) {
   let pos = 0;
   for (let i = 0; i < route.length; i++) {
     const next = pos + toMM(route[i].length, route[i].unit);
-    if (x <= next + 1e-6) return { segment: i + 1, direction: route[i].direction || 'Straight', startMM: pos, endMM: next };
+    if (x <= next + 1e-6) return { segment: i + 1, direction: route[i].direction || 'Right', startMM: pos, endMM: next };
     pos = next;
   }
-  return { segment: route.length, direction: 'Straight', startMM: pos, endMM: pos };
+  return { segment: route.length, direction: 'Right', startMM: pos, endMM: pos };
 }
 
 function nearestFeatureClearance(x, points) {
@@ -284,7 +404,7 @@ function nearestFeatureClearance(x, points) {
   return Math.min(...points.map(p => Math.abs(p.x - x)));
 }
 
-function candidateLocations(totalMM, mode, safe, points, circuit, record) {
+function candidateLocations(totalMM, mode, safe, points, circuit, route, record) {
   const raw = [];
   if (mode === 1) raw.push({ label: 'Mode 1 antinode', x: totalMM / 2, local: false });
   if (mode === 2) raw.push({ label: 'Mode 2 antinode A', x: totalMM / 4, local: false }, { label: 'Mode 2 antinode B', x: totalMM * 3 / 4, local: false });
@@ -298,10 +418,23 @@ function candidateLocations(totalMM, mode, safe, points, circuit, record) {
   }
   raw.push({ label: 'Condenser-side safe straight region', x: totalMM * 0.88, local: false });
   for (const trapPoint of points.filter(p => p.type === 'utrap-bend')) raw.push({ label: 'Safe straight U-trap leg', x: trapPoint.x + CLEARANCE_MM, local: true });
+  const maxRingWidth = Math.max(...RING_STOCK.map(r => r.widthMM));
+  const usableForLargestRing = validCenterIntervals(route, points, totalMM, maxRingWidth);
+  for (const interval of usableForLargestRing) {
+    raw.push({ label: `Centre of usable segment ${interval.segment}`, x: (interval.start + interval.end) / 2, local: false });
+    for (let x = Math.ceil(interval.start / ENGINEERING_CONFIG.candidateGridMM) * ENGINEERING_CONFIG.candidateGridMM; x <= interval.end + 1e-6; x += ENGINEERING_CONFIG.candidateGridMM) {
+      raw.push({ label: `Grid segment ${interval.segment}`, x, local: false, grid: true });
+    }
+  }
   const candidates = [];
+  const seen = new Set();
   for (const item of raw) {
-    const ns = nearestSafe(Math.max(0, Math.min(totalMM, item.x)), safe);
+    const ns = nearestUsableCenter(Math.max(0, Math.min(totalMM, item.x)), usableForLargestRing) || nearestSafe(Math.max(0, Math.min(totalMM, item.x)), safe);
     if (!ns) continue;
+    const roundedX = Math.round(ns.x * 1000) / 1000;
+    const key = `${roundedX}:${item.local ? 'local' : 'global'}:${item.grid ? 'grid' : 'ref'}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     const phi = modeShape(mode, ns.x, totalMM);
     const moved = Math.abs(ns.x - item.x);
     const c = { ...item, originalX: item.x, x: ns.x, moved, participation: phi, participationSquared: phi ** 2, rejected: false, reason: '' };
@@ -368,21 +501,101 @@ function dynamicStatus(currentBrazeVmax, currentRisk, afterRisk, staticResult, p
   return 'Low screening concern';
 }
 
+function stockRingForMass(massG) {
+  const active = RING_STOCK.filter(r => r.inventoryStatus === 'active').sort((a, b) => a.massG - b.massG);
+  return active.find(r => r.massG >= massG - 1e-6) || active[active.length - 1] || null;
+}
+
+function spacingForLargestRings() {
+  const maxWidth = Math.max(...RING_STOCK.map(r => r.widthMM));
+  return maxWidth + ENGINEERING_CONFIG.ringGapMM;
+}
+
+function selectSpacedCandidates(candidates, count, preferred = []) {
+  const selected = [];
+  const minSpacing = spacingForLargestRings();
+  const ordered = [...preferred, ...candidates].filter(Boolean);
+  const seen = new Set();
+  for (const candidate of ordered) {
+    const key = Math.round(candidate.x * 1000) / 1000;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (selected.every(s => Math.abs(s.x - candidate.x) >= minSpacing)) selected.push(candidate);
+    if (selected.length === count) break;
+  }
+  return selected;
+}
+
+function fitRingInStraightSection(ring, route, points) {
+  if (!(ring.widthMM > 0)) return { pass: false, reason: 'RING GEOMETRY INCOMPLETE - PHYSICAL INSTALLATION CANNOT BE VERIFIED.' };
+  const section = routeSection(ring.x, route);
+  const half = ring.widthMM / 2;
+  const cStart = featureClearanceAtBoundary(section.startMM, points);
+  const cEnd = featureClearanceAtBoundary(section.endMM, points);
+  if (ring.x - half < section.startMM + cStart - 1e-6) return { pass: false, reason: `ring crosses start clearance of segment ${section.segment}` };
+  if (ring.x + half > section.endMM - cEnd + 1e-6) return { pass: false, reason: `ring crosses end clearance of segment ${section.segment}` };
+  return { pass: true, section };
+}
+
+function nearestTypedClearance(x, points, types) {
+  const selected = points.filter(p => types.includes(p.type));
+  if (!selected.length) return Infinity;
+  return Math.min(...selected.map(p => Math.abs(p.x - x)));
+}
+
+export function validateFinalRecommendation(layout, { routeTotalMM, route, points, pipe, operating, measuredNaturalHz, surfaceTempC, pressure, pressureUnit }) {
+  const reasons = [];
+  if (!layout || !Array.isArray(layout.rings) || !layout.rings.length) reasons.push('no rings in recommendation');
+  const rings = [...(layout?.rings || [])].sort((a, b) => a.x - b.x);
+  const activeMasses = new Set(RING_STOCK.filter(r => r.inventoryStatus === 'active').map(r => r.massG));
+  for (const ring of rings) {
+    if (!activeMasses.has(ring.massG)) reasons.push(`ring ${ring.ring} mass is not active stock`);
+    if (!(ring.widthMM > 0)) reasons.push('RING GEOMETRY INCOMPLETE - PHYSICAL INSTALLATION CANNOT BE VERIFIED.');
+    if (!(Number.isFinite(ring.x) && ring.x > 0 && ring.x < routeTotalMM)) reasons.push(`ring ${ring.ring} location is outside route`);
+    const fit = fitRingInStraightSection(ring, route, points);
+    if (!fit.pass) reasons.push(`ring ${ring.ring}: ${fit.reason}`);
+    for (const p of points) {
+      const required = CLEARANCE_MM + ring.widthMM / 2;
+      if (Math.abs(ring.x - p.x) < required - 1e-6) reasons.push(`ring ${ring.ring} violates ${p.label} clearance at ${round(p.x, 1)} mm`);
+    }
+  }
+  for (let i = 0; i < rings.length; i++) {
+    for (let j = i + 1; j < rings.length; j++) {
+      const required = rings[i].widthMM / 2 + rings[j].widthMM / 2 + ENGINEERING_CONFIG.ringGapMM;
+      const actual = Math.abs(rings[i].x - rings[j].x);
+      if (actual < required - 1e-6) reasons.push(`rings ${rings[i].ring} and ${rings[j].ring} violate minimum spacing`);
+    }
+  }
+  const effectiveKg = rings.reduce((sum, r) => sum + r.massKg * modeShape(layout.mode || 1, r.x, routeTotalMM) ** 2, 0);
+  const predictedHz = measuredNaturalHz * Math.sqrt(pipe.modalMass / (pipe.modalMass + effectiveKg));
+  const risk = harmonicRisk(predictedHz, operating).nearest;
+  const staticResult = staticCheck(pipe, rings, surfaceTempC);
+  const pressureResult = pressureScreening(pipe, pressure, pressureUnit, staticResult.stressPa);
+  if (!staticResult.pass) reasons.push(staticResult.rejectionReason || 'static screening failed');
+  if (risk.risk !== 'Low') reasons.push('resonance risk is not Low after final masses and locations');
+  return { pass: reasons.length === 0, reasons, rings, effectiveKg, predictedHz, risk, staticResult, pressureResult };
+}
+
 function buildRings(layoutName, candidates, ratio, modalMass) {
   const sorted = [...candidates].sort((a, b) => b.participationSquared - a.participationSquared);
   if (!sorted.length) return [];
   if (layoutName === 'A') return [{ ...sorted[0], massKg: modalMass * ratio }];
-  if (layoutName === 'B') return sorted.slice(0, 2).map(c => ({ ...c, massKg: modalMass * ratio / 2 }));
+  if (layoutName === 'B') return selectSpacedCandidates(candidates, 2, sorted).map(c => ({ ...c, massKg: modalMass * ratio / 2 }));
   if (layoutName === 'C') {
     const main = sorted[0];
-    const local = candidates.find(c => c.local) || sorted[1] || sorted[0];
+    const local = selectSpacedCandidates(candidates, 2, [main, ...candidates.filter(c => c.local), ...sorted])[1];
+    if (!local) return [{ ...main, massKg: modalMass * ratio }];
     return [{ ...main, massKg: modalMass * ratio * 0.72 }, { ...local, massKg: modalMass * ratio * 0.28, localCorrective: true }];
   }
-  if (layoutName === 'D') return sorted.slice(0, 3).map(c => ({ ...c, massKg: modalMass * ratio / Math.min(3, sorted.length) }));
-  return sorted.slice(0, 3).map(c => ({ ...c, massKg: modalMass * ratio * 1.2 / Math.min(3, sorted.length) }));
+  if (layoutName === 'D') {
+    const selected = selectSpacedCandidates(candidates, 3, sorted);
+    return selected.map(c => ({ ...c, massKg: modalMass * ratio / Math.min(3, selected.length) }));
+  }
+  const selected = selectSpacedCandidates(candidates, 3, sorted);
+  return selected.map(c => ({ ...c, massKg: modalMass * ratio * 1.2 / Math.min(3, selected.length) }));
 }
 
-function evaluateLayouts({ pipe, candidates, operating, measuredNaturalHz, currentRisk, pressure, pressureUnit, surfaceTempC, points, route, currentBrazeVmax, record }) {
+function evaluateLayouts({ pipe, candidates, operating, measuredNaturalHz, currentRisk, pressure, pressureUnit, surfaceTempC, points, route, routeTotalMM, mode, currentBrazeVmax, record }) {
   const testedRatios = [...MASS_RATIOS];
   const layouts = [];
   const names = ['A', 'B', 'C', 'D', 'E'];
@@ -397,13 +610,26 @@ function evaluateLayouts({ pipe, candidates, operating, measuredNaturalHz, curre
     for (const name of names) {
       const rings = buildRings(name, candidates, ratio, pipe.modalMass);
       if (!rings.length) continue;
-      const effectiveKg = rings.reduce((sum, r) => sum + r.massKg * r.participationSquared, 0);
+      const stockMapped = rings.map((r, i) => {
+        const stock = stockRingForMass(r.massKg * 1000);
+        return {
+          ...r,
+          ring: i + 1,
+          massKg: stock.massG / 1000,
+          massG: stock.massG,
+          widthMM: stock.widthMM,
+          stock,
+          participation: modeShape(mode, r.x, routeTotalMM),
+          participationSquared: modeShape(mode, r.x, routeTotalMM) ** 2
+        };
+      });
+      const effectiveKg = stockMapped.reduce((sum, r) => sum + r.massKg * r.participationSquared, 0);
       const predictedHz = measuredNaturalHz * Math.sqrt(pipe.modalMass / (pipe.modalMass + effectiveKg));
       const afterRisk = harmonicRisk(predictedHz, operating).nearest;
-      const staticResult = staticCheck(pipe, rings, surfaceTempC);
+      const staticResult = staticCheck(pipe, stockMapped, surfaceTempC);
       const pressureResult = pressureScreening(pipe, pressure, pressureUnit, staticResult.stressPa);
-      const criticalBrazeCoverage = rings.reduce((best, r) => Math.max(best, r.localCorrective ? 1 : 0.5 / Math.max(1, nearestFeatureClearance(r.x, points.filter(p => p.type === 'braze')) / CLEARANCE_MM)), 0);
-      const concentratedLoadMetric = Math.max(...rings.map(r => r.massKg)) / Math.max(0.000001, rings.reduce((s, r) => s + r.massKg, 0));
+      const criticalBrazeCoverage = stockMapped.reduce((best, r) => Math.max(best, r.localCorrective ? 1 : 0.5 / Math.max(1, nearestFeatureClearance(r.x, points.filter(p => p.type === 'braze')) / CLEARANCE_MM)), 0);
+      const concentratedLoadMetric = Math.max(...stockMapped.map(r => r.massKg)) / Math.max(0.000001, stockMapped.reduce((s, r) => s + r.massKg, 0));
       const rejectionReasons = [];
       if (!staticResult.pass) rejectionReasons.push(staticResult.rejectionReason);
       if (afterRisk.risk !== 'Low') rejectionReasons.push('after-layout resonance risk is not Low');
@@ -411,9 +637,10 @@ function evaluateLayouts({ pipe, candidates, operating, measuredNaturalHz, curre
         layout: name,
         label: layoutLabels[name],
         ratio,
-        rings: rings.map((r, i) => ({ ring: i + 1, massKg: r.massKg, massG: r.massKg * 1000, x: r.x, participation: r.participation, participationSquared: r.participationSquared, localCorrective: !!r.localCorrective, section: routeSection(r.x, route), nearbyFeature: classifyLocation(r.x, points), clearanceMM: nearestFeatureClearance(r.x, points) })),
-        ringCount: rings.length,
-        totalPhysicalMassKg: rings.reduce((s, r) => s + r.massKg, 0),
+        mode,
+        rings: stockMapped.map((r, i) => ({ ring: i + 1, massKg: r.massKg, massG: r.massG, widthMM: r.widthMM, x: r.x, participation: r.participation, participationSquared: r.participationSquared, localCorrective: !!r.localCorrective, section: routeSection(r.x, route), nearbyFeature: classifyLocation(r.x, points), clearanceMM: nearestFeatureClearance(r.x, points), bendClearanceMM: nearestTypedClearance(r.x, points, ['bend', 'utrap-bend']), brazeClearanceMM: nearestTypedClearance(r.x, points, ['braze']) })),
+        ringCount: stockMapped.length,
+        totalPhysicalMassKg: stockMapped.reduce((s, r) => s + r.massKg, 0),
         effectiveModalMassKg: effectiveKg,
         predictedNaturalHz: predictedHz,
         nearestHarmonic: afterRisk,
@@ -426,18 +653,21 @@ function evaluateLayouts({ pipe, candidates, operating, measuredNaturalHz, curre
         rejectionReasons,
         rankingReasons: []
       };
+      const finalCheck = validateFinalRecommendation(layout, { routeTotalMM, route, points, pipe, operating, measuredNaturalHz, surfaceTempC, pressure, pressureUnit });
+      layout.finalValidation = finalCheck;
+      if (!finalCheck.pass) rejectionReasons.push(...finalCheck.reasons);
       layouts.push(layout);
     }
   }
   MASS_RATIOS.forEach(pushForRatio);
-  let valid = layouts.filter(l => l.staticResult.pass && l.resonanceRisk === 'Low');
+  let valid = layouts.filter(l => l.finalValidation?.pass);
   let iterativeOutcome = 'Not needed; at least one standard ratio reached Low risk.';
   if (!valid.length) {
     for (let pct = 1; pct <= 100; pct += 0.1) {
       const ratio = Number((pct / 100).toFixed(4));
       testedRatios.push(ratio);
       pushForRatio(ratio);
-      valid = layouts.filter(l => l.staticResult.pass && l.resonanceRisk === 'Low');
+      valid = layouts.filter(l => l.finalValidation?.pass);
       if (valid.length) {
         iterativeOutcome = `Found Low-risk layout at ${round(pct, 1)}% of modal mass.`;
         break;
@@ -479,21 +709,32 @@ function compareFallbackLayouts(a, b) {
 }
 
 function roundDisplayedLayout(layout, pipe, operating, measuredNaturalHz, surfaceTempC, pressure, pressureUnit) {
-  const roundedRings = layout.rings.map(r => ({ ...r, massG: Math.round(r.massG / 5) * 5, massKg: Math.round(r.massG / 5) * 5 / 1000 }));
+  const roundedRings = layout.rings.map(r => {
+    const stock = stockRingForMass(Math.round(r.massG / 5) * 5);
+    return { ...r, massG: stock.massG, massKg: stock.massG / 1000, widthMM: stock.widthMM };
+  }).sort((a, b) => a.x - b.x).map((r, i) => ({ ...r, ring: i + 1 }));
   const effectiveKg = roundedRings.reduce((sum, r) => sum + r.massKg * r.participationSquared, 0);
   const predictedHz = measuredNaturalHz * Math.sqrt(pipe.modalMass / (pipe.modalMass + effectiveKg));
   const risk = harmonicRisk(predictedHz, operating).nearest;
   const staticResult = staticCheck(pipe, roundedRings, surfaceTempC);
   const pressureResult = pressureScreening(pipe, pressure, pressureUnit, staticResult.stressPa);
-  return { ...layout, rings: roundedRings, effectiveModalMassKg: effectiveKg, predictedNaturalHz: predictedHz, nearestHarmonic: risk, resonanceRisk: risk.risk, staticResult, pressureResult, roundingVerification: staticResult.pass && risk.risk === 'Low' ? 'Displayed rounded masses pass final static and resonance checks.' : 'Displayed rounded masses require engineering review.' };
+  return { ...layout, rings: roundedRings, ringCount: roundedRings.length, totalPhysicalMassKg: roundedRings.reduce((s, r) => s + r.massKg, 0), effectiveModalMassKg: effectiveKg, predictedNaturalHz: predictedHz, nearestHarmonic: risk, resonanceRisk: risk.risk, staticResult, pressureResult, roundingVerification: staticResult.pass && risk.risk === 'Low' ? 'Displayed stock masses pass final static and resonance checks.' : 'Displayed stock masses require engineering review.' };
 }
 
 export function validateCircuitInputs(circuit, pipe, index) {
   const prefix = `Circuit ${index + 1}: `;
   const errors = [];
+  const segmentNumbers = new Set();
   for (const [i, row] of circuit.route.entries()) {
-    const len = finite(row.length, NaN);
+    const len = toMM(row.length, row.unit);
     if (!(len > 0)) errors.push(`${prefix}segment ${i + 1} length must be greater than 0.`);
+    if (!Number.isFinite(len)) errors.push(`${prefix}segment ${i + 1} length or unit is invalid.`);
+    if (!DIRECTION_OPTIONS.includes(row.direction)) errors.push(`${prefix}segment ${i + 1} direction must be Right, Left, Up, Down, or Diagonal.`);
+    const number = Number(row.number || i + 1);
+    if (!Number.isInteger(number) || number <= 0) errors.push(`${prefix}segment ${i + 1} number is invalid.`);
+    if (segmentNumbers.has(number)) errors.push(`${prefix}duplicate segment number ${number}.`);
+    segmentNumbers.add(number);
+    if (i === 0 && row.feature === 'compressor') errors.push(`${prefix}compressor connection is fixed at 0 mm and cannot be the first segment end feature.`);
   }
   const totalMM = routeLengthMM(circuit.route);
   if (!(totalMM > 0)) errors.push(`${prefix}total route length must be greater than 0.`);
@@ -511,14 +752,23 @@ export function validateCircuitInputs(circuit, pipe, index) {
   const manual = toMM(circuit.manualTotal, circuit.manualTotalUnit);
   if (Number.isFinite(manual) && manual > 0) {
     const diff = Math.abs(manual - totalMM) / totalMM * 100;
-    if (diff > 2) errors.push(`${prefix}Route length mismatch. Check all segment lengths.`);
+    if (diff > ENGINEERING_CONFIG.manualTotalTolerancePercent) errors.push(`${prefix}Route length mismatch. Check all segment lengths.`);
   }
+  const trialConditions = new Set((circuit.measurements || []).map(m => String(m.condition || '').trim()).filter(Boolean));
+  if (trialConditions.size > 1) errors.push(`${prefix}measurement rows cannot mix different trial conditions.`);
   for (const [i, m] of (circuit.measurements || []).entries()) {
     const x = toMM(m.distance, m.unit);
     if (x < 0) errors.push(`${prefix}measurement ${i + 1} position is below 0.`);
     if (x > totalMM) errors.push(`${prefix}measurement ${i + 1} position exceeds total route length.`);
   }
   for (const [i, trap] of (circuit.uTraps || []).entries()) {
+    const sections = routeSections(circuit.route);
+    const synced = segmentSelectedUTrapFeatures(trap, sections, totalMM);
+    const selected = (trap.segments || trap.segmentNumbers || []).map(Number).filter(Number.isFinite);
+    if (selected.length) {
+      if (!synced) errors.push(`${prefix}U-trap ${i + 1} must select three consecutive route segments.`);
+      continue;
+    }
     const start = toMM(trap.start, trap.unit);
     const end = start + toMM(trap.p1, trap.unit) + toMM(trap.p2, trap.unit) + toMM(trap.p3, trap.unit);
     if (start < 0) errors.push(`${prefix}U-trap ${i + 1} start is below 0.`);
@@ -538,13 +788,18 @@ export function calculateCircuit(circuitInput, pipeInput, index = 0) {
   const record = { raw: { circuit, pipe: pipeInput }, errors, routeSumMM: routeTotalMM, generatedCandidates: [], movedCandidates: [], blockedIntervals: [], safeIntervals: [], candidateLayouts: [] };
   if (errors.length) return { circuitIndex: index, errors, record };
   const pipe = pipeCalculations(pipeInput, routeTotalMM);
-  const points = [...routeFeatures(circuit.route, routeTotalMM), ...uTrapFeatures(circuit.uTraps, routeTotalMM)];
-  const blocked = blockedIntervals(points, routeTotalMM);
+  const points = dedupePoints([...routeFeatures(circuit.route, routeTotalMM), ...uTrapFeatures(circuit.uTraps, routeTotalMM, circuit.route)]);
+  const maxRingWidth = Math.max(...RING_STOCK.map(r => r.widthMM));
+  const blocked = blockedIntervals(points, routeTotalMM, maxRingWidth);
   const safe = safeIntervals(blocked, routeTotalMM);
   record.blockedIntervals = blocked;
   record.safeIntervals = safe;
   if (!safe.length) return { circuitIndex: index, errors: [`Circuit ${index + 1}: no safe ring location exists.`], record };
-  circuit.measurements = (circuit.measurements || []).map(row => ({ ...row, calculatedVmax: Math.max(finite(row.vertical), finite(row.horizontal)), classification: classifyLocation(toMM(row.distance, row.unit), points) }));
+  circuit.measurements = (circuit.measurements || []).map(row => {
+    const calculatedVgov = Math.max(finite(row.vertical), finite(row.horizontal));
+    const calculatedV2D = Math.sqrt(finite(row.vertical) ** 2 + finite(row.horizontal) ** 2);
+    return { ...row, featureDistanceMM: Number.isFinite(toMM(row.featureDistance ?? row.distance, row.unit)) ? toMM(row.featureDistance ?? row.distance, row.unit) : '', actualSensorDistanceMM: toMM(row.distance, row.unit), calculatedVgov, calculatedV2D, calculatedVmax: calculatedVgov, classification: classifyLocation(toMM(row.distance, row.unit), points) };
+  });
   const brazeRows = circuit.measurements.filter(m => m.classification === FEATURES.braze);
   const worstBrazeVmax = brazeRows.reduce((max, m) => Math.max(max, m.calculatedVmax), 0);
   const freqs = screeningFrequencies(pipe);
@@ -552,11 +807,14 @@ export function calculateCircuit(circuitInput, pipeInput, index = 0) {
   const nearestMode = nearestScreeningMode(measured, freqs);
   const mismatchPercent = Math.abs(nearestMode.frequencyHz - measured) / measured * 100;
   const currentRisk = harmonicRisk(measured, circuit.operating).nearest;
-  const candidates = candidateLocations(routeTotalMM, nearestMode.mode, safe, points, circuit, record);
+  const candidates = candidateLocations(routeTotalMM, nearestMode.mode, safe, points, circuit, circuit.route, record);
   if (!candidates.length) return { circuitIndex: index, errors: [`Circuit ${index + 1}: no safe ring location exists.`], record };
-  const { layouts, selected } = evaluateLayouts({ pipe, candidates, operating: circuit.operating, measuredNaturalHz: measured, currentRisk, pressure: pipeInput.pressure, pressureUnit: pipeInput.pressureUnit, surfaceTempC: pipeInput.surfaceTempC, points, route: circuit.route, currentBrazeVmax: worstBrazeVmax, record });
+  const { layouts, selected } = evaluateLayouts({ pipe, candidates, operating: circuit.operating, measuredNaturalHz: measured, currentRisk, pressure: pipeInput.pressure, pressureUnit: pipeInput.pressureUnit, surfaceTempC: pipeInput.surfaceTempC, points, route: circuit.route, routeTotalMM, mode: nearestMode.mode, currentBrazeVmax: worstBrazeVmax, record });
   if (!selected) return { circuitIndex: index, errors: [`Circuit ${index + 1}: every layout fails static screening.`], record: { ...record, pipe, screeningFrequencies: freqs, currentRisk } };
   const rounded = roundDisplayedLayout(selected, pipe, circuit.operating, measured, pipeInput.surfaceTempC, pipeInput.pressure, pipeInput.pressureUnit);
+  const finalValidation = validateFinalRecommendation(rounded, { routeTotalMM, route: circuit.route, points, pipe, operating: circuit.operating, measuredNaturalHz: measured, surfaceTempC: pipeInput.surfaceTempC, pressure: pipeInput.pressure, pressureUnit: pipeInput.pressureUnit });
+  rounded.finalValidation = finalValidation;
+  if (!finalValidation.pass) return { circuitIndex: index, errors: [`Circuit ${index + 1}: NO PHYSICALLY VALID SAFE CONFIGURATION FOUND.`], record: { ...record, pipe, screeningFrequencies: freqs, currentRisk, finalValidation } };
   const warning = mismatchPercent > 20 ? 'Measured and screening frequencies differ significantly. Measured frequency is used for design; candidate locations require field confirmation.' : '';
   const brazeWarning = worstBrazeVmax >= BRAZE_TARGET_MM_S ? 'Braze vibration exceeds the 5 mm/s target. The calculated layout requires field verification after installation.' : '';
   const result = {
@@ -625,5 +883,5 @@ export function round(value, digits = 2) {
 }
 
 export function assertNoBadVisibleValues(text) {
-  return !/\b(NaN|Infinity|undefined|null)\b/.test(String(text));
+  return !/\b(NaN|Infinity|undefined)\b/.test(String(text));
 }

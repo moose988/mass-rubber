@@ -84,7 +84,7 @@
   </main>
 
   <script type="module">
-    import { createInitialState, adjustCircuitCount, calculateUnit, buildEngineeringRecordText, toMM, isSerialLikeModel, assertNoBadVisibleValues } from './src/worker-engine.js';
+    import { createInitialState, adjustCircuitCount, calculateUnit, buildEngineeringRecordText, toMM, isSerialLikeModel, assertNoBadVisibleValues, DIRECTION_OPTIONS } from './src/worker-engine.js';
     import { getCloudPersistenceStatus, getModelPipeData, listUnitRecords, loadUnitRecord, saveModelPipeData, saveUnitRecord, warmCloudPersistence } from './src/cloud-persistence.js';
 
     let state = createInitialState(1);
@@ -131,18 +131,23 @@
 
     function routeTable(circuit, ci) {
       return `<div class="table-wrap"><table data-role="route" data-ci="${ci}"><thead><tr><th>Segment Number</th><th>Segment Length</th><th>Unit</th><th>Direction</th><th>Feature at Segment End</th><th>Notes</th><th>Delete</th></tr></thead><tbody>${circuit.route.map((r, ri) => `<tr>
-        <td>${ri + 1}</td>
+        <td><input data-ci="${ci}" data-ri="${ri}" data-field="number" value="${esc(r.number || ri + 1)}" type="number" step="1"></td>
         <td><input data-ci="${ci}" data-ri="${ri}" data-field="length" value="${esc(r.length)}" type="number" step="any"></td>
         <td><select data-ci="${ci}" data-ri="${ri}" data-field="unit"><option ${r.unit==='mm'?'selected':''}>mm</option><option ${r.unit==='inch'?'selected':''}>inch</option><option ${r.unit==='m'?'selected':''}>m</option></select></td>
-        <td><select data-ci="${ci}" data-ri="${ri}" data-field="direction">${['Straight','Up','Down','Left','Right','Diagonal Up','Diagonal Down','Custom'].map(v => `<option ${r.direction===v?'selected':''}>${v}</option>`).join('')}</select></td>
-        <td><select data-ci="${ci}" data-ri="${ri}" data-field="feature">${[{v:'none',l:'None'},{v:'bend',l:'Bend'},{v:'braze',l:'Brazed Joint'},{v:'condenser',l:'Condenser/Coil/Header Entrance'},{v:'compressor',l:'Compressor Connection'},{v:'other',l:'Other No-Place Point'}].map(o => `<option value="${o.v}" ${r.feature===o.v?'selected':''}>${o.l}</option>`).join('')}</select></td>
+        <td><select data-ci="${ci}" data-ri="${ri}" data-field="direction">${DIRECTION_OPTIONS.map(v => `<option ${r.direction===v?'selected':''}>${v}</option>`).join('')}</select></td>
+        <td><select data-ci="${ci}" data-ri="${ri}" data-field="feature">${[{v:'none',l:'None'},{v:'bend',l:'Bend'},{v:'braze',l:'Brazed Joint'},{v:'condenser',l:'Condenser/Coil/Header Entrance'},{v:'other',l:'Other No-Place Point'}].map(o => `<option value="${o.v}" ${r.feature===o.v?'selected':''}>${o.l}</option>`).join('')}</select></td>
         <td><input data-ci="${ci}" data-ri="${ri}" data-field="notes" value="${esc(r.notes)}"></td>
         <td><button type="button" class="danger" data-action="delete-route" data-ci="${ci}" data-ri="${ri}">Delete</button></td>
       </tr>`).join('')}</tbody></table></div>`;
     }
 
     function uTrapTable(circuit, ci) {
-      return `<div class="table-wrap"><table><thead><tr><th>Start distance along total discharge line</th><th>Piece 1 length</th><th>Piece 2 length</th><th>Piece 3 length</th><th>Units</th><th>Braze location</th><th>Custom offset</th><th>Delete</th></tr></thead><tbody>${(circuit.uTraps || []).map((u, ui) => `<tr>
+      return `<p class="note">The Route Builder defines the complete pipe. The U-Trap Builder identifies which route segments form the U-trap and its internal braze.</p><div class="table-wrap"><table><thead><tr><th>Segment 1</th><th>Segment 2</th><th>Segment 3</th><th>Start distance along total discharge line</th><th>Piece 1 length</th><th>Piece 2 length</th><th>Piece 3 length</th><th>Units</th><th>Braze location</th><th>Custom offset</th><th>Delete</th></tr></thead><tbody>${(circuit.uTraps || []).map((u, ui) => {
+        const segs = u.segments || ['', '', ''];
+        return `<tr>
+        <td><input data-ci="${ci}" data-ui="${ui}" data-u-seg="0" value="${esc(segs[0] || '')}" type="number" step="1"></td>
+        <td><input data-ci="${ci}" data-ui="${ui}" data-u-seg="1" value="${esc(segs[1] || '')}" type="number" step="1"></td>
+        <td><input data-ci="${ci}" data-ui="${ui}" data-u-seg="2" value="${esc(segs[2] || '')}" type="number" step="1"></td>
         <td><input data-ci="${ci}" data-ui="${ui}" data-u="start" value="${esc(u.start)}" type="number" step="any"></td>
         <td><input data-ci="${ci}" data-ui="${ui}" data-u="p1" value="${esc(u.p1)}" type="number" step="any"></td>
         <td><input data-ci="${ci}" data-ui="${ui}" data-u="p2" value="${esc(u.p2)}" type="number" step="any"></td>
@@ -151,17 +156,22 @@
         <td><select data-ci="${ci}" data-ui="${ui}" data-u="braze">${[{v:'none',l:'None'},{v:'p1mid',l:'Middle of Piece 1'},{v:'p2mid',l:'Middle of Piece 2'},{v:'p3mid',l:'Middle of Piece 3'},{v:'custom',l:'Custom offset'}].map(o => `<option value="${o.v}" ${u.braze===o.v?'selected':''}>${o.l}</option>`).join('')}</select></td>
         <td><input data-ci="${ci}" data-ui="${ui}" data-u="customBrazeOffset" value="${esc(u.customBrazeOffset || '')}" type="number" step="any"></td>
         <td><button type="button" class="danger" data-action="delete-utrap" data-ci="${ci}" data-ui="${ui}">Delete</button></td>
-      </tr>`).join('')}</tbody></table></div>`;
+      </tr>`;
+      }).join('')}</tbody></table></div>`;
     }
 
     function measurementTable(circuit, ci) {
-      return `<div class="table-wrap"><table><thead><tr><th>Measurement Name</th><th>Distance along total discharge line</th><th>Distance Unit</th><th>Vertical Vrms, mm/s</th><th>Horizontal/Axial Vrms, mm/s</th><th>Calculated Vmax</th><th>Calculated Classification</th><th>Delete</th></tr></thead><tbody>${(circuit.measurements || []).map((m, mi) => `<tr>
-        <td><input data-ci="${ci}" data-mi="${mi}" data-m="name" value="${esc(m.name)}"></td>
+      const names = ['Near compressor','Previous recommended position','Old support position','First U-trap braze','Near final bend','Final braze','Custom'];
+      const conditions = ['Unsupported baseline','Support only','Rings only','Rings and support','Other trial'];
+      return `<div class="table-wrap"><table><thead><tr><th>Condition</th><th>Measurement Name</th><th>Actual Sensor Distance</th><th>Distance Unit</th><th>Vertical Vrms, mm/s</th><th>Horizontal/Axial Vrms, mm/s</th><th>Governing Velocity</th><th>Two-axis Resultant</th><th>Calculated Classification</th><th>Delete</th></tr></thead><tbody>${(circuit.measurements || []).map((m, mi) => `<tr>
+        <td><select data-ci="${ci}" data-mi="${mi}" data-m="condition">${conditions.map(v => `<option ${m.condition===v?'selected':''}>${v}</option>`).join('')}</select></td>
+        <td><select data-ci="${ci}" data-mi="${mi}" data-m="name">${names.map(v => `<option ${m.name===v?'selected':''}>${v}</option>`).join('')}</select></td>
         <td><input data-ci="${ci}" data-mi="${mi}" data-m="distance" value="${esc(m.distance)}" type="number" step="any"></td>
         <td><select data-ci="${ci}" data-mi="${mi}" data-m="unit"><option ${m.unit==='mm'?'selected':''}>mm</option><option ${m.unit==='inch'?'selected':''}>inch</option><option ${m.unit==='m'?'selected':''}>m</option></select></td>
         <td><input data-ci="${ci}" data-mi="${mi}" data-m="vertical" value="${esc(m.vertical)}" type="number" step="any"></td>
         <td><input data-ci="${ci}" data-mi="${mi}" data-m="horizontal" value="${esc(m.horizontal)}" type="number" step="any"></td>
         <td>${esc(Math.max(num(m.vertical), num(m.horizontal)).toFixed(2))}</td>
+        <td>${esc(Math.sqrt(num(m.vertical) ** 2 + num(m.horizontal) ** 2).toFixed(2))}</td>
         <td>${esc(m.classification || 'Calculated after run')}</td>
         <td><button type="button" class="danger" data-action="delete-measurement" data-ci="${ci}" data-mi="${mi}">Delete</button></td>
       </tr>`).join('')}</tbody></table></div>`;
@@ -250,6 +260,11 @@
       document.querySelectorAll('[data-u]').forEach(el => el.addEventListener('input', e => {
         state.circuits[+e.target.dataset.ci].uTraps[+e.target.dataset.ui][e.target.dataset.u] = e.target.value;
       }));
+      document.querySelectorAll('[data-u-seg]').forEach(el => el.addEventListener('input', e => {
+        const trap = state.circuits[+e.target.dataset.ci].uTraps[+e.target.dataset.ui];
+        trap.segments = trap.segments || ['', '', ''];
+        trap.segments[+e.target.dataset.uSeg] = e.target.value;
+      }));
       document.querySelectorAll('[data-m]').forEach(el => el.addEventListener('input', e => {
         state.circuits[+e.target.dataset.ci].measurements[+e.target.dataset.mi][e.target.dataset.m] = e.target.value;
       }));
@@ -263,13 +278,13 @@
         const action = e.target.dataset.action;
         const ci = +e.target.dataset.ci;
         const c = state.circuits[ci];
-        if (action === 'add-route') c.route.push({ length: '', unit: 'mm', direction: 'Straight', feature: 'none', notes: '' });
+        if (action === 'add-route') c.route.push({ number: c.route.length + 1, length: '', unit: 'mm', direction: 'Right', feature: 'none', notes: '' });
         if (action === 'remove-route' && c.route.length > 1) c.route.pop();
         if (action === 'delete-route' && c.route.length > 1) c.route.splice(+e.target.dataset.ri, 1);
         if (action === 'calc-route') alert(`Route length: ${c.route.reduce((s, r) => s + (Number.isFinite(toMM(r.length, r.unit)) ? toMM(r.length, r.unit) : 0), 0).toFixed(2)} mm`);
-        if (action === 'add-utrap') c.uTraps.push({ start: '', p1: '', p2: '', p3: '', unit: 'mm', braze: 'none', customBrazeOffset: '' });
+        if (action === 'add-utrap') c.uTraps.push({ segments: ['', '', ''], start: '', p1: '', p2: '', p3: '', unit: 'mm', braze: 'p1mid', customBrazeOffset: '' });
         if (action === 'delete-utrap') c.uTraps.splice(+e.target.dataset.ui, 1);
-        if (action === 'add-measurement') c.measurements.push({ name: '', distance: '', unit: 'mm', vertical: '', horizontal: '' });
+        if (action === 'add-measurement') c.measurements.push({ condition: 'Unsupported baseline', name: 'Custom', distance: '', unit: 'mm', vertical: '', horizontal: '' });
         if (action === 'delete-measurement') c.measurements.splice(+e.target.dataset.mi, 1);
         renderAll();
       }));
@@ -277,7 +292,7 @@
 
     function resultHtml(result) {
       const l = result.selectedLayout;
-      const rings = l.rings.map(r => `<li>Ring ${r.ring}: ${r.massG.toFixed(0)} g<br>Centreline location: ${r.x.toFixed(1)} mm from compressor outlet<br>Route section: segment ${r.section.segment}<br>Nearby feature: ${esc(r.nearbyFeature)}<br>Minimum clearance to nearest bend/braze: ${Number.isFinite(r.clearanceMM) ? r.clearanceMM.toFixed(1) : 'not applicable'} mm</li>`).join('');
+      const rings = l.rings.map(r => `<li>Circuit ${result.circuitIndex + 1} - Ring ${r.ring}: Install ${r.massG.toFixed(0)} g at ${r.x.toFixed(1)} mm from the compressor on Segment ${r.section.segment}.<br>Direction/orientation: ${esc(r.section.direction)}<br>Ring axial width: ${r.widthMM.toFixed(1)} mm<br>Nearest feature: ${esc(r.nearbyFeature)}<br>Clearance from nearest bend: ${Number.isFinite(r.bendClearanceMM) ? r.bendClearanceMM.toFixed(1) : 'not applicable'} mm<br>Clearance from nearest braze: ${Number.isFinite(r.brazeClearanceMM) ? r.brazeClearanceMM.toFixed(1) : 'not applicable'} mm</li>`).join('');
       return `<article class="result-card">
         <h3>${esc(result.title)}</h3>
         ${result.mismatchWarning ? `<div class="warning">${result.mismatchWarning}</div>` : ''}

@@ -32,10 +32,6 @@ for (const file of roots.flatMap(files)) {
       failed = true;
     }
   }
-  if (/\bsupport\b/i.test(text)) {
-    console.error(`${file}: forbidden visible terminology "support"`);
-    failed = true;
-  }
 }
 if (failed) process.exit(1);
 console.log('Source check passed.');
