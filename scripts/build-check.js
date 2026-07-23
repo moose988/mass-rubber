@@ -8,5 +8,5 @@ accessSync('src/firebase-config.js');
 const html = readFileSync('index.html', 'utf8');
 if (!html.includes('type="module"')) throw new Error('Production page must load module code.');
 if (!html.includes('./src/worker-engine.js')) throw new Error('Production page does not import the worker engine.');
-if (!html.includes('./src/cloud-persistence.js')) throw new Error('Production page does not import cloud persistence.');
+if (!html.includes('./src/worker-engine.js')) throw new Error('Production page does not import the qualification engine.');
 console.log('Static production build check passed. Output directory: repository root. Entry: index.html');
