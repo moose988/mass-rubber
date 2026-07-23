@@ -26,3 +26,5 @@ export async function approvedRecipes(scopeId) {
   return (await s.firestore.getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
 }
 export async function saveTestRecord(record) { const s = await services(); return s.firestore.addDoc(s.firestore.collection(s.db, 'unit_records'), { ...record, savedAt: new Date().toISOString() }); }
+/** Read-only bridge for records created before the protected schema existed. */
+export async function legacyModels() { const s = await services(); return (await s.firestore.getDocs(s.firestore.collection(s.db, 'daham_worker_model_pipe_data'))).docs.map(d => ({ id: d.id, ...d.data() })); }

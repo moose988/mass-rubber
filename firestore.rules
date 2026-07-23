@@ -8,6 +8,10 @@ service cloud.firestore {
     match /unit_records/{id} { allow read: if signedIn() && resource.data.scopeId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.scopes; allow create: if signedIn() && request.resource.data.scopeId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.scopes; allow update, delete: if engineer(); }
     match /audit_log/{id} { allow read: if engineer(); allow create: if signedIn(); allow update, delete: if false; }
     match /users/{id} { allow read: if signedIn() && request.auth.uid == id; allow write: if false; }
+    // Existing pre-migration records are visible only to engineers/admins. They
+    // remain immutable through the browser and are never exposed to workers.
+    match /daham_worker_model_pipe_data/{id} { allow read: if engineer(); allow write: if false; }
+    match /daham_worker_unit_records/{id} { allow read: if engineer(); allow write: if false; }
     match /{document=**} { allow read, write: if false; }
   }
 }
