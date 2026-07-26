@@ -35,7 +35,7 @@ async function fillCircuitOne() {
     await page.selectOption(`select[data-ci="0"][data-ri="${i}"][data-field="unit"]`, 'inch');
     if (i === rows.length - 1) await page.selectOption(`select[data-ci="0"][data-ri="${i}"][data-field="feature"]`, 'condenser');
   }
-  await page.fill('#op_0_speed', '700');
+await page.fill('#op_0_speed', '700');
   await page.selectOption('#op_0_speedUnit', 'RPM');
   await page.fill('#op_0_measuredNaturalHz', '35');
   await page.fill('#op_0_operatingDominantHz', '35');
@@ -55,6 +55,10 @@ await page.click('#calculateBtn');
 await page.waitForSelector('.result-card');
 if (!await page.locator('text=Circuit 1 Recommendation').count()) throw new Error('Circuit 1 result not shown');
 await page.click('#saveBtn');
+await page.fill('#op_0_speed', '725');
+await page.click('#saveBtn');
+await page.selectOption('#savedUnits', 'U-PLAY-1__PLAY-900');
+if (await page.inputValue('#op_0_speed') !== '725') throw new Error('Edited compressor speed was not retained by saved-unit reload.');
 await page.selectOption('#circuitCount', '4');
 await page.selectOption('#sameGeometry', 'no');
 await page.selectOption('#circuitCount', '1');

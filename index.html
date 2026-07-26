@@ -95,7 +95,11 @@
     const num = value => Number.isFinite(Number(value)) ? Number(value) : 0;
 
     function field(id, label, value, attrs = '') {
-      return `<div><label for="${id}">${label}</label><input id="${id}" value="${esc(value)}" ${attrs}></div>`;
+      // Legacy operating-field templates used a literal '+ci+' placeholder.
+      // Resolve it from the generated field id so edits target the right circuit.
+      const ci = /^op_(\d+)_/.exec(id)?.[1];
+      const safeAttrs = ci === undefined ? attrs : attrs.replace(/data-ci="'\+ci\+'"/g, `data-ci="${ci}"`);
+      return `<div><label for="${id}">${label}</label><input id="${id}" value="${esc(value)}" ${safeAttrs}></div>`;
     }
 
     function select(id, label, value, options) {
