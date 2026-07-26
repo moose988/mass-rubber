@@ -89,6 +89,7 @@
 
     let state = createInitialState(1);
     let lastResults = [];
+    let loadedRecordId = '';
     const $ = id => document.getElementById(id);
     const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
     const num = value => Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -112,6 +113,7 @@
       $('modelNotice').textContent = '';
       const saved = await listUnitRecords(localStorage);
       $('savedUnits').innerHTML = '<option value="">Select saved unit</option>' + saved.map(r => `<option value="${esc(r.id)}">${esc(r.unitNumber)} / ${esc(r.unitModel)} / ${esc(r.date || '')}</option>`).join('');
+      $('savedUnits').value = loadedRecordId;
     }
 
     function renderPipe() {
@@ -337,17 +339,21 @@
       renderAll();
     }
 
-    $('resetBtn').addEventListener('click', () => { state = createInitialState(1); lastResults = []; $('results').innerHTML = ''; $('messages').innerHTML = ''; renderAll(); });
+    $('resetBtn').addEventListener('click', () => { state = createInitialState(1); lastResults = []; loadedRecordId = ''; $('results').innerHTML = ''; $('messages').innerHTML = ''; renderAll(); });
     $('calculateBtn').addEventListener('click', calculate);
     $('saveBtn').addEventListener('click', async () => {
       const out = calculateUnit(state);
       if (out.errors.length) { $('messages').innerHTML = `<div class="error">Fix these inputs first:\n- ${out.errors.map(esc).join('\n- ')}</div>`; return; }
       $('status').textContent = 'Saving unit...';
-      const saved = await saveUnitRecord(localStorage, out.state, out.results, id => confirm(`Replace saved data for ${id}?`));
+      const saved = await saveUnitRecord(localStorage, out.state, out.results, id => {
+        if (loadedRecordId === id) return true;
+        return confirm(`Replace saved data for ${id}?`);
+      });
+      if (saved.saved) loadedRecordId = saved.record.id;
       $('status').textContent = saved.saved
         ? saved.cloudSaved
-          ? `Saved unit ${saved.record.unitNumber} / ${saved.record.unitModel} to Firebase.`
-          : `Saved unit ${saved.record.unitNumber} / ${saved.record.unitModel} on this device. ${saved.cloudReason || 'Firebase is not configured.'}`
+          ? `Updated shared Firebase unit ${saved.record.unitNumber} / ${saved.record.unitModel}.`
+          : `NOT SHARED — saved only on this device. ${saved.cloudReason || 'Firebase is not configured.'}`
         : saved.reason;
       renderAll();
     });
@@ -365,6 +371,7 @@
     $('savedUnits').addEventListener('change', async e => {
       const record = await loadUnitRecord(localStorage, e.target.value);
       if (!record) return;
+      loadedRecordId = record.id;
       state = { schemaVersion: record.schemaVersion, unit: record.unit, sameGeometry: record.sameGeometry, pipe: record.modelPipeData, circuits: record.circuits };
       lastResults = record.recommendations || [];
       $('status').textContent = `Loaded saved unit ${record.unitNumber} / ${record.unitModel}.`;

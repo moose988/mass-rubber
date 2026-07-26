@@ -156,6 +156,17 @@ test('saved units can be exported and imported on another device', () => {
   assert.equal(loaded.unitModel, 'MR-900');
 });
 
+test('saving an edited unit with the same identity replaces the existing record', () => {
+  const storage = memoryStorage();
+  const state = baseState(1);
+  const first = saveUnitRecord(storage, calculateUnit(state).state, calculateUnit(state).results, () => true);
+  state.unit.testerName = 'Edited by QA';
+  const second = saveUnitRecord(storage, calculateUnit(state).state, calculateUnit(state).results, () => true);
+  assert.equal(first.record.id, second.record.id);
+  assert.equal(exportSavedData(storage).unitRecords.length, 1);
+  assert.equal(loadUnitRecord(storage, first.record.id).tester, 'Edited by QA');
+});
+
 test('focused conversions, intervals, validation, variable bands, serial safeguard', () => {
   assert.equal(Number(pressureToPa(1, 'psi').toFixed(3)), 6894.757);
   assert.equal(pressureToPa(2, 'bar'), 200000);

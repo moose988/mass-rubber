@@ -105,7 +105,12 @@ export async function saveUnitRecord(storage, state, results, confirmReplace = (
   if (!api) return { ...saved, cloudSaved: false, cloudReason: cloudState.reason };
 
   try {
-    await api.firestore.setDoc(api.firestore.doc(unitCollection(api), cleanId(saved.record.id)), stripUndefined(saved.record));
+    const ref = api.firestore.doc(unitCollection(api), cleanId(saved.record.id));
+    await api.firestore.setDoc(ref, stripUndefined(saved.record));
+    // Do not report a shared save until the canonical Firestore document can be
+    // read back. This prevents a local-cache save being mistaken for a sync.
+    const verification = await api.firestore.getDoc(ref);
+    if (!verification.exists()) throw new Error('Firebase did not confirm the saved unit.');
     await saveModelPipeData(storage, saved.record.unitModel, saved.record.modelPipeData, () => true);
     return { ...saved, cloudSaved: true };
   } catch (error) {
