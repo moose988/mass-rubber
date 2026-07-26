@@ -8,8 +8,7 @@
     "build": "node scripts/write-firebase-config.js && node scripts/build-check.js",
     "lint": "node scripts/source-check.js",
     "typecheck": "node scripts/source-check.js",
-    "preview": "npx http-server . -p 4173 -c-1",
-    "test:e2e": "node scripts/ui-verify.mjs"
+    "preview": "npx http-server . -p 4173 -c-1"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.1",

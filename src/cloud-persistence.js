@@ -52,11 +52,11 @@ async function initCloud() {
 }
 
 function unitCollection(api) {
-  return api.firestore.collection(api.db, 'unit_records');
+  return api.firestore.collection(api.db, `${firebaseCollectionPrefix}_unit_records`);
 }
 
 function modelCollection(api) {
-  return api.firestore.collection(api.db, 'recipes');
+  return api.firestore.collection(api.db, `${firebaseCollectionPrefix}_model_pipe_data`);
 }
 
 export function getCloudPersistenceStatus() {
