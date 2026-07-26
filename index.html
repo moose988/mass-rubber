@@ -254,28 +254,54 @@
       bindDynamic();
     }
 
+    // Capture the live form just before calculation/save as well as while the
+    // user edits it. This covers dropdowns and mobile browsers that do not
+    // consistently emit an input event for every control.
+    function syncFormState() {
+      const assign = (selector, apply) => document.querySelectorAll(selector).forEach(el => apply(el));
+      state.unit.unitNumber = $('unitNumber').value;
+      state.unit.unitModel = $('unitModel').value;
+      state.unit.date = $('date').value;
+      state.unit.testerName = $('testerName').value;
+      state.sameGeometry = $('sameGeometry').value;
+      assign('[data-field]', el => state.circuits[+el.dataset.ci].route[+el.dataset.ri][el.dataset.field] = el.value);
+      assign('[data-u]', el => state.circuits[+el.dataset.ci].uTraps[+el.dataset.ui][el.dataset.u] = el.value);
+      assign('[data-u-seg]', el => {
+        const trap = state.circuits[+el.dataset.ci].uTraps[+el.dataset.ui];
+        trap.segments = trap.segments || ['', '', ''];
+        trap.segments[+el.dataset.uSeg] = el.value;
+      });
+      assign('[data-m]', el => state.circuits[+el.dataset.ci].measurements[+el.dataset.mi][el.dataset.m] = el.value);
+      assign('[data-o]', el => state.circuits[+el.dataset.ci].operating[el.dataset.o] = el.value);
+      assign('[data-op]', el => state.circuits[+el.dataset.ci][el.dataset.op] = el.value);
+    }
+
     function bindDynamic() {
-      document.querySelectorAll('[data-field]').forEach(el => el.addEventListener('input', e => {
+      const bind = (selector, handler) => document.querySelectorAll(selector).forEach(el => {
+        el.addEventListener('input', handler);
+        el.addEventListener('change', handler);
+      });
+      bind('[data-field]', e => {
         const c = state.circuits[+e.target.dataset.ci];
         c.route[+e.target.dataset.ri][e.target.dataset.field] = e.target.value;
-      }));
-      document.querySelectorAll('[data-u]').forEach(el => el.addEventListener('input', e => {
+      });
+      bind('[data-u]', e => {
         state.circuits[+e.target.dataset.ci].uTraps[+e.target.dataset.ui][e.target.dataset.u] = e.target.value;
-      }));
-      document.querySelectorAll('[data-u-seg]').forEach(el => el.addEventListener('input', e => {
+      });
+      bind('[data-u-seg]', e => {
         const trap = state.circuits[+e.target.dataset.ci].uTraps[+e.target.dataset.ui];
         trap.segments = trap.segments || ['', '', ''];
         trap.segments[+e.target.dataset.uSeg] = e.target.value;
-      }));
-      document.querySelectorAll('[data-m]').forEach(el => el.addEventListener('input', e => {
+      });
+      bind('[data-m]', e => {
         state.circuits[+e.target.dataset.ci].measurements[+e.target.dataset.mi][e.target.dataset.m] = e.target.value;
-      }));
-      document.querySelectorAll('[data-o]').forEach(el => el.addEventListener('input', e => {
+      });
+      bind('[data-o]', e => {
         state.circuits[+e.target.dataset.ci].operating[e.target.dataset.o] = e.target.value;
-      }));
-      document.querySelectorAll('[data-op]').forEach(el => el.addEventListener('input', e => {
+      });
+      bind('[data-op]', e => {
         state.circuits[+e.target.dataset.ci][e.target.dataset.op] = e.target.value;
-      }));
+      });
       document.querySelectorAll('[data-action]').forEach(btn => btn.addEventListener('click', e => {
         const action = e.target.dataset.action;
         const ci = +e.target.dataset.ci;
@@ -324,6 +350,7 @@
     }
 
     function calculate() {
+      syncFormState();
       $('messages').innerHTML = '';
       const out = calculateUnit(state);
       lastResults = out.results;
@@ -342,6 +369,7 @@
     $('resetBtn').addEventListener('click', () => { state = createInitialState(1); lastResults = []; loadedRecordId = ''; $('results').innerHTML = ''; $('messages').innerHTML = ''; renderAll(); });
     $('calculateBtn').addEventListener('click', calculate);
     $('saveBtn').addEventListener('click', async () => {
+      syncFormState();
       const out = calculateUnit(state);
       if (out.errors.length) { $('messages').innerHTML = `<div class="error">Fix these inputs first:\n- ${out.errors.map(esc).join('\n- ')}</div>`; return; }
       $('status').textContent = 'Saving unit...';
